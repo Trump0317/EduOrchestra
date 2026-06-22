@@ -133,7 +133,7 @@ eduorchestra/
 │   ├── vite.config.ts
 │   ├── package.json
 │   └── src/
-│       ├── main.tsx App.tsx
+│       ├── main.tsx App.tsx App.css
 │       ├── pages/
 │       │   ├── Dashboard.tsx
 │       │   ├── AnswerView.tsx
