@@ -25,10 +25,21 @@
 ┌───────────────────▼──────────────────────────┐
 │           FastAPI 服务层 (端口 8000)          │
 │  ┌────────────────────────────────────────┐  │
-│  │  main.py    应用入口 + /api/health     │  │
+│  │  main.py    应用入口                   │  │
 │  │  config.py  配置管理（.env 读取）      │  │
-│  │  routers/                              │  │
+│  │  routers/     API 路由                 │  │
 │  │  └── config.py  GET/PUT /api/config    │  │
+│  └────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────┐  │
+│  │  orchestrator/  LangGraph 状态图       │  │
+│  │  ├── state.py   AgentState 定义        │  │
+│  │  ├── graph.py   图编排 + 条件路由      │  │
+│  │  └── agents/    Agent 节点             │  │
+│  │      ├── planner.py                    │  │
+│  │      ├── resource.py                   │  │
+│  │      ├── practice.py                   │  │
+│  │      ├── analytics.py                  │  │
+│  │      └── feedback.py                   │  │
 │  └────────────────────────────────────────┘  │
 └──────────────────────────────────────────────┘
 ```
@@ -50,16 +61,29 @@ eduorchestra/
 │   ├── routers/              ← API 路由
 │   │   ├── __init__.py
 │   │   └── config.py         ← 配置 API
+│   ├── orchestrator/         ← LangGraph 状态图（v0.2）
+│   │   ├── __init__.py
+│   │   ├── state.py          ← AgentState
+│   │   ├── graph.py          ← 图编排
+│   │   └── agents/           ← Agent 节点
+│   │       ├── __init__.py
+│   │       ├── planner.py
+│   │       ├── resource.py
+│   │       ├── practice.py
+│   │       ├── analytics.py
+│   │       └── feedback.py
 │   └── tests/                ← 后端测试
 │       ├── __init__.py
 │       ├── conftest.py
 │       ├── unit/
 │       │   ├── __init__.py
-│       │   └── test_config.py
+│       │   ├── test_config.py
+│       │   └── test_graph_structure.py  ← 状态图测试（v0.2）
 │       └── integration/
 │           ├── __init__.py
 │           ├── test_health.py
-│           └── test_config_api.py
+│           ├── test_config_api.py
+│           └── test_workflow.py          ← 分段 invoke（v0.2）
 ├── client/                   ← React 前端
 │   ├── index.html
 │   ├── vite.config.ts
@@ -92,3 +116,5 @@ eduorchestra/
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/config` | 获取配置（LLM provider/model） |
 | PUT | `/api/config` | 更新配置 |
+
+
