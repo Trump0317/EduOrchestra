@@ -63,13 +63,21 @@ eduorchestra/
 ├── client/                   ← React 前端
 │   ├── index.html
 │   ├── vite.config.ts
+│   ├── tsconfig.json
 │   ├── package.json
 │   └── src/
 │       ├── main.tsx
 │       ├── App.tsx
 │       └── App.css
 ├── data/                     ← 运行时数据目录
-│   └── mock/                 ← Mock 数据（后续版本使用）
+│   ├── .gitkeep
+│   ├── mock/                 ← Mock 数据（后续版本使用）
+│   │   └── .gitkeep
+│   └── prompts/              ← Prompt 模板（后续版本使用）
+│       └── .gitkeep
+├── .env.example              ← LLM 配置模板
+├── .gitignore
+├── AGENTS.md                 ← Piper 开发助手配置
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md
