@@ -34,6 +34,8 @@
 │  │  orchestrator/  LangGraph 状态图       │  │
 │  │  ├── state.py   AgentState 定义        │  │
 │  │  ├── graph.py   图编排 + 条件路由      │  │
+│  │  ├── llm.py     LLM 客户端封装         │  │
+│  │  ├── prompt.py  Prompt 模板引擎        │  │
 │  │  └── agents/    Agent 节点             │  │
 │  │      ├── planner.py                    │  │
 │  │      ├── resource.py                   │  │
@@ -61,10 +63,12 @@ eduorchestra/
 │   ├── routers/              ← API 路由
 │   │   ├── __init__.py
 │   │   └── config.py         ← 配置 API
-│   ├── orchestrator/         ← LangGraph 状态图（v0.2）
+│   ├── orchestrator/         ← LangGraph 状态图（v0.2）+ LLM（v0.3）
 │   │   ├── __init__.py
 │   │   ├── state.py          ← AgentState
 │   │   ├── graph.py          ← 图编排
+│   │   ├── llm.py            ← LLM 客户端（v0.3）
+│   │   ├── prompt.py         ← Prompt 模板引擎（v0.3）
 │   │   └── agents/           ← Agent 节点
 │   │       ├── __init__.py
 │   │       ├── planner.py
@@ -78,12 +82,18 @@ eduorchestra/
 │       ├── unit/
 │       │   ├── __init__.py
 │       │   ├── test_config.py
-│       │   └── test_graph_structure.py  ← 状态图测试（v0.2）
+│       │   ├── test_llm.py             ← LLM 客户端测试（v0.3）
+│       │   ├── test_prompt.py          ← Prompt 模板测试（v0.3）
+│       │   └── test_graph_structure.py ← 状态图测试（v0.2）
 │       └── integration/
 │           ├── __init__.py
 │           ├── test_health.py
 │           ├── test_config_api.py
-│           └── test_workflow.py          ← 分段 invoke（v0.2）
+│           ├── test_workflow.py          ← 分段 invoke（v0.2）
+│           ├── test_planner.py           ← Planner + LLM（v0.3）
+│           ├── test_resource.py          ← Resource + LLM（v0.3）
+│           ├── test_analytics.py         ← Analytics + LLM（v0.3）
+│           └── test_feedback.py          ← Feedback + LLM（v0.3）
 ├── client/                   ← React 前端
 │   ├── index.html
 │   ├── vite.config.ts
@@ -97,8 +107,11 @@ eduorchestra/
 │   ├── .gitkeep
 │   ├── mock/                 ← Mock 数据（后续版本使用）
 │   │   └── .gitkeep
-│   └── prompts/              ← Prompt 模板（后续版本使用）
-│       └── .gitkeep
+│   └── prompts/              ← Prompt 模板（v0.3 启用）
+│       ├── planner.txt
+│       ├── resource.txt
+│       ├── analytics.txt
+│       └── feedback.txt
 ├── .env.example              ← LLM 配置模板
 ├── .gitignore
 ├── AGENTS.md                 ← Piper 开发助手配置
