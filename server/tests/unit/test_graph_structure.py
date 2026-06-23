@@ -85,7 +85,10 @@ def test_check_answer_wrong():
     assert check_answer(q, "A") is False
 
 
-def test_analytics_computes_accuracy():
+@patch("orchestrator.agents.analytics.llm_invoke_json")
+def test_analytics_computes_accuracy(mock_llm):
+    """统计计算独立于 LLM，mock LLM 避免慢速调用"""
+    mock_llm.return_value = {"weak_points": ["mock"], "summary": "mock"}
     state = make_base_state(
         answers=[
             {"question_id": "q1", "student_answer": "A", "is_correct": True, "correct_answer": "A"},
