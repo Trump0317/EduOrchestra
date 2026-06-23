@@ -146,4 +146,4 @@ def test_graph_edge_chain():
 
 def test_graph_interrupts_before_practice():
     graph = build_graph()
-    assert "practice" in (graph.interrupt_before_nodes or [])
+    assert "practice" in (graph.interrupt_after_nodes or [])

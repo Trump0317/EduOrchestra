@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from orchestrator.state import AgentState
 from orchestrator.agents.planner import planner_node
@@ -38,4 +39,4 @@ def build_graph() -> StateGraph:
 
     graph.set_entry_point("planner")
 
-    return graph.compile(interrupt_before=["practice"])
+    return graph.compile(checkpointer=MemorySaver(), interrupt_after=["practice"])
