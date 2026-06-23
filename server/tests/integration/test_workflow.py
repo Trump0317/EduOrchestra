@@ -33,7 +33,7 @@ def test_workflow_runs_to_practice():
 
     assert state["waiting_for_answer"] is True
     assert len(state["questions"]) > 0
-    assert len(state["plan"]) == 2
+    assert len(state["plan"]) >= 2
     assert len(state["resources"]) > 0
     assert state.get("analytics") is None  # 还未执行
 

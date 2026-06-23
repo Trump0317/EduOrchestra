@@ -13,6 +13,8 @@
 # - test_graph_edge_chain: planner→resource→practice 链路存在
 # - test_graph_interrupts_before_practice: practice 在 interrupt_before 中
 
+from unittest.mock import patch
+
 from orchestrator.agents.planner import planner_node
 from orchestrator.agents.resource import resource_node
 from orchestrator.agents.practice import practice_node, check_answer, Question
@@ -43,9 +45,15 @@ def make_base_state(**overrides) -> dict:
 # ---- Agent 单元测试 ----
 
 def test_planner_returns_fixed_plan():
-    result = planner_node(make_base_state())
+    """mock LLM 返回固定计划，验证解析逻辑"""
+    mock_plan = {"steps": [
+        {"title": "理解概念", "desc": "学习基本定义"},
+        {"title": "掌握图像", "desc": "学习图像性质"},
+    ]}
+    with patch("orchestrator.agents.planner.llm_invoke_json", return_value=mock_plan):
+        result = planner_node(make_base_state())
     assert len(result["plan"]) == 2
-    assert result["plan"][0]["title"]
+    assert result["plan"][0]["title"] == "理解概念"
     assert result["plan"][0]["desc"]
     # 不应修改 current_step
     assert "current_step" not in result
