@@ -1,150 +1,186 @@
 # 测试策略
 
+> 状态：v0.2 设计期
+
 ## 测试分层
 
 ```
         /\
-       /E2E\         <- 少量：启动完整服务，浏览器验证核心流程
+       /E2E\         <- 少量：启动服务，模拟完整学习流程
       /------\
-     /Integration\   <- 中量：FastAPI 路由 + Agent mock
+     /Integration\   <- 中量：单个 Agent + LLM 集成，状态图分段运行
     /------------\
-   /  Unit Tests  \  <- 大量：模型、服务函数、Agent 逻辑
+   /  Unit Tests  \  <- 大量：状态图结构、Practice 判题逻辑
   /________________\
 ```
 
 ## 各层策略
 
-| 层级 | 范围 | Mock 策略 | 框架 |
-|------|------|----------|------|
-| 单元测试 | 单个函数、模型方法 | mock LLM 调用、数据库操作 | pytest |
-| 集成测试 | FastAPI 路由 + 数据库 | mock LLM 调用 | pytest + httpx |
-| E2E 测试 | 启动服务 + 浏览器 | 真实 LLM 或 mock | 手动 / Playwright (后续) |
+| 层级 | 范围 | 策略 | 框架 |
+|------|------|------|------|
+| 单元测试 | Practice 判题、状态图结构断言 | 不调 LLM，纯逻辑测试 | pytest |
+| 集成测试 | 单个 Agent + 真实 LLM | 调真实 LLM，断言结构而非内容 | pytest |
+| E2E 测试 | 完整状态图流转 | 调真实 LLM，分段 invoke | 手动 / pytest |
 
-## 后端测试
+---
 
-### 单元测试
+## 测试原则
+
+- **真实 LLM**：Agent 集成测试调真实 LLM，不 mock。因为 mock 返回值无法验证 prompt 质量
+- **断言结构**：不断言 LLM 输出内容（每次可能不同），只断言输出格式和字段存在
+- **分段 invoke**：Practice 节点有 interrupt，测试时分段运行状态图
+
+## 单元测试
+
+针对不调 LLM 的纯逻辑：
+
+### Practice 判题逻辑
 
 ```python
-# server/tests/unit/test_question_gen.py
-# 测试行为：
-# - test_generate_question_returns_structured_data: 输入合法知识点，返回含核心字段的结构化题目
-# - test_generate_question_handles_empty_knowledge: 空知识点时返回空列表
-# - test_generate_question_validates_llm_output: LLM 返回缺字段时，校验器拦截
-import pytest
-from unittest.mock import AsyncMock, patch
-from services.question_gen import QuestionGenerator
+# server/tests/unit/test_practice.py
+# 测试 Practice Agent 的判题和题目读取逻辑
+from orchestrator.agents.practice import check_answer, load_questions
 
-@pytest.mark.asyncio
-async def test_generate_question_returns_structured_data():
-    """AI 题目生成应返回符合核心字段的结构化数据"""
-    gen = QuestionGenerator(llm_service=mock_llm)
+def test_load_questions_by_kp():
+    """根据知识点 ID 加载题目"""
+    questions = load_questions(["kp-2-1"])
+    assert len(questions) > 0
+    assert all("content" in q for q in questions)
 
-    result = await gen.generate(knowledge_point="二次函数定义")
+def test_check_answer_correct():
+    question = {"answer": "B"}
+    assert check_answer(question, "B") is True
 
-    assert "content" in result
-    assert "answer" in result
-    assert "explanation" in result
-    assert result["difficulty"] in ("easy", "medium", "hard")
+def test_check_answer_wrong():
+    question = {"answer": "B"}
+    assert check_answer(question, "A") is False
 ```
 
-### Mock 数据 Fixture
+### 状态图结构
 
 ```python
-# server/tests/conftest.py
-import json, pytest
-from pathlib import Path
+# server/tests/unit/test_graph_structure.py
+from orchestrator.graph import build_graph
 
-@pytest.fixture
-def mock_knowledge():
-    """加载 mock 知识点数据"""
-    path = Path(__file__).parent.parent / "data" / "mock" / "knowledge.json"
-    return json.loads(path.read_text())
+def test_graph_has_all_nodes():
+    graph = build_graph()
+    nodes = graph.get_graph().nodes.keys()
+    assert "planner" in nodes
+    assert "resource" in nodes
+    assert "practice" in nodes
+    assert "analytics" in nodes
+    assert "feedback" in nodes
 
-@pytest.fixture
-def mock_questions():
-    """加载 mock 题目数据"""
-    path = Path(__file__).parent.parent / "data" / "mock" / "questions.json"
-    return json.loads(path.read_text())
+def test_graph_starts_from_planner():
+    graph = build_graph()
+    edges = graph.get_graph().edges
+    # 有从 START 到 planner 的边
+    assert ("__start__", "planner") in edges or any(
+        src == "__start__" for src, _, _ in edges
+    )
 ```
 
-### 集成测试
+## 集成测试
+
+每个 Agent 调真实 LLM，断言输出结构：
 
 ```python
-# server/tests/integration/test_practice_api.py
-from httpx import AsyncClient, ASGITransport
-from main import app
+# server/tests/integration/test_planner.py
+# 调真实 LLM，断言返回结构
+from orchestrator.agents.planner import planner_node
+from orchestrator.state import AgentState
 
-@pytest.mark.asyncio
-async def test_start_practice_and_submit():
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        # 开始答题
-        resp = await client.post("/api/practice/start", json={
-            "knowledge_points": ["kp_quadratic_func"]
-        })
-        assert resp.status_code == 200
-        session_id = resp.json()["session_id"]
-
-        # 获取题目
-        resp = await client.get(f"/api/practice/next?session_id={session_id}")
-        assert resp.status_code == 200
-        question = resp.json()
-
-        # 提交答案
-        resp = await client.post("/api/practice/submit", json={
-            "session_id": session_id,
-            "question_id": question["id"],
-            "answer": question["answer"],  # 正确答案
-            "time_spent": 45
-        })
-        assert resp.status_code == 200
-        assert resp.json()["correct"] is True
+def test_planner_returns_steps():
+    """Planner Agent 应返回步骤序列"""
+    state = {"task_goal": "掌握二次函数"}
+    result = planner_node(state)
+    assert "plan" in result
+    assert isinstance(result["plan"], list)
+    assert len(result["plan"]) >= 1
+    assert "title" in result["plan"][0]
+    assert "desc" in result["plan"][0]
 ```
 
-## 前端测试
-
-前端 UI 组件不写自动化测试，采用开发服务器 + 浏览器手动验证：
-
-1. `cd client && npm run dev`
-2. 开发者在浏览器中查看
-3. 反馈修改意见 → 修改 → 刷新浏览器
-
-## Mock 策略
+### 状态图分段测试
 
 ```python
-# LLM mock: 返回预设 JSON，避免调真实 API
-mock_llm = AsyncMock()
-mock_llm.generate_json.return_value = {
-    "content": r"已知函数 $f(x) = x^2 + 2x + 1$，求 $f(3)$ 的值。",
-    "answer": "16",
-    "explanation": "将 x=3 代入: f(3) = 3^2 + 2×3 + 1 = 9 + 6 + 1 = 16",
-    "knowledge_points": ["kp_quadratic_func"],
-    "difficulty": "easy"
-}
+# server/tests/integration/test_workflow.py
+# 分段 invoke 状态图，验证流转逻辑
+from orchestrator.graph import build_graph
 
-# 数据库 mock: 使用 SQLite 内存数据库
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+def test_workflow_to_practice():
+    """状态图应跑到 Practice 节点暂停"""
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "test-1"}}
+
+    state = graph.invoke(
+        {"task_goal": "掌握二次函数", "task_id": "test-task"},
+        config
+    )
+    # 断言跑到了 Practice 并等待答案
+    assert state["waiting_for_answer"] is True
+    assert len(state["current_questions"]) > 0
+
+def test_workflow_resume_after_answer():
+    """提交答案后状态图应继续流转"""
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "test-2"}}
+
+    # 第一段：跑到 Practice
+    state = graph.invoke(
+        {"task_goal": "掌握二次函数", "task_id": "test-task"},
+        config
+    )
+    # 注入答案并 resume
+    graph.update_state(config, {
+        "answers": [{
+            "question_id": state["current_questions"][0]["id"],
+            "student_answer": "B",
+            "is_correct": True,
+            "correct_answer": "B"
+        }],
+        "waiting_for_answer": False,
+    })
+    state = graph.invoke(None, config)
+
+    # 断言跑到了反馈
+    assert "feedback" in state
+    assert "analytics" in state
+```
+
+## Chat 集成测试
+
+```python
+# server/tests/integration/test_chat.py
+from orchestrator.agents.chat import chat_response
+
+def test_chat_with_task_context():
+    """Chat 应能够基于任务上下文回答问题"""
+    response = chat_response(
+        message="二次函数的对称轴怎么求？",
+        context={"task_goal": "掌握二次函数", "current_step": 1}
+    )
+    assert isinstance(response, str)
+    assert len(response) > 0
 ```
 
 ## 测试目录结构
 
 ```
 server/tests/
-├── conftest.py              ← 全局 fixtures、mock 工厂
+├── conftest.py                  ← 全局 fixtures
 ├── unit/
-│   ├── test_question_gen.py ← AI 题目生成
-│   ├── test_exam_import.py  ← 真题导入
-│   ├── test_knowledge.py    ← 知识图谱逻辑
-│   ├── test_analytics.py    ← 学情分析逻辑
-│   ├── test_feedback.py     ← 反馈生成逻辑
-│   ├── test_tutor.py        ← 对话辅导逻辑
-│   └── test_planner.py      ← 计划拆解逻辑
+│   ├── __init__.py
+│   ├── test_practice.py         ← 判题逻辑、题目加载
+│   └── test_graph_structure.py  ← 状态图节点和边
 ├── integration/
-│   ├── test_questions_api.py
-│   ├── test_practice_api.py
-│   ├── test_analytics_api.py
-│   ├── test_plans_api.py
-│   └── test_chat_api.py
-└── e2e/                     ← 后续添加
+│   ├── __init__.py
+│   ├── test_planner.py          ← Planner + LLM
+│   ├── test_resource.py         ← Resource + LLM
+│   ├── test_analytics.py        ← Analytics + LLM
+│   ├── test_feedback.py         ← Feedback + LLM
+│   ├── test_workflow.py         ← 状态图分段流转
+│   └── test_chat.py             ← Chat + LLM
+└── e2e/
+    └── test_full_flow.py        ← 完整学习循环
 ```
