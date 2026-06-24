@@ -63,7 +63,7 @@ eduorchestra/
 │   ├── workflow.md testing.md commit.md
 │   ├── versions.md
 │   └── versions/
-│       └── v0.1.md, v0.2.md, v0.3.md, v0.4.md, v0.5.md
+│       └── v0.1.md, v0.2.md, v0.3.md, v0.4.md, v0.5.md, v0.6.md
 ├── server/                   ← Python 后端
 │   ├── main.py               ← FastAPI 入口
 │   ├── config.py             ← 配置管理
@@ -75,6 +75,7 @@ eduorchestra/
 │   │   ├── state.py          ← AgentState
 │   │   ├── graph.py          ← 图编排 + 条件路由
 │   │   ├── llm.py            ← LLM 客户端
+│   │   ├── tools.py          ← 外部工具（搜索等，v0.6+）
 │   │   ├── prompt.py         ← Prompt 模板引擎
 │   │   └── agents/           ← Agent 节点
 │   │       ├── assistant.py  ← 全局主管（v0.5）
