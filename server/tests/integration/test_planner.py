@@ -8,8 +8,8 @@ import pytest
 from orchestrator.agents.planner import planner_node
 
 
-def make_state(goal: str) -> dict:
-    return {
+def make_state(goal: str = "掌握二次函数", **overrides) -> dict:
+    state = {
         "task_id": "test-planner",
         "task_goal": goal,
         "plan": [],
@@ -22,6 +22,8 @@ def make_state(goal: str) -> dict:
         "feedback": None,
         "next_action": "",
     }
+    state.update(overrides)
+    return state
 
 
 class TestPlanner:
@@ -41,13 +43,31 @@ class TestPlanner:
             assert isinstance(step["title"], str) and len(step["title"]) > 0
             assert isinstance(step["desc"], str) and len(step["desc"]) > 0
 
-    def test_planner_handles_specific_goal(self):
-        """不同目标能生成不同计划"""
-        state = make_state("学会解一元二次方程")
+    def test_planner_replan_when_stuck(self):
+        """卡住场景：replan 应拆分或调整当前步骤"""
+        state = make_state(
+            plan=[
+                {"title": "理解概念", "desc": "学习基本定义"},
+                {"title": "综合应用", "desc": "解决复杂二次函数问题"},
+            ],
+            current_step=1,  # 卡在第二步
+            step_history=[
+                {"step_index": 0, "rounds": 1, "best_accuracy": 1.0, "latest_accuracy": 1.0},
+                {"step_index": 1, "rounds": 1, "best_accuracy": 0.2, "latest_accuracy": 0.2},
+                {"step_index": 1, "rounds": 2, "best_accuracy": 0.3, "latest_accuracy": 0.3},
+            ],
+            feedback={
+                "summary": "综合应用困难",
+                "strengths": [],
+                "weaknesses": ["缺乏中间步骤训练", "从概念直接跳到应用跨度太大"],
+                "suggestion": "增加中间难度过渡",
+            },
+        )
         result = planner_node(state)
 
-        plan = result["plan"]
-        titles_text = " ".join(s["title"] for s in plan)
-        # 计划应体现"方程"相关内容
-        assert len(plan) >= 2
-        assert len(titles_text) > 0
+        assert "plan" in result
+        new_plan = result["plan"]
+        # 已完成步骤（index 0）应保留
+        assert new_plan[0]["title"] == "理解概念"
+        # 新计划应有合理步骤数
+        assert 2 <= len(new_plan) <= 6
