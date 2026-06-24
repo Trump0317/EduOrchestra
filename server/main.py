@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import config
 from routers import task
+from routers import progress
 
 app = FastAPI(
     title="EduOrchestra",
@@ -20,6 +21,7 @@ app.add_middleware(
 
 app.include_router(config.router)
 app.include_router(task.router)
+app.include_router(progress.router)
 
 
 @app.get("/api/health")

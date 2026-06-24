@@ -128,4 +128,10 @@ def submit_answer(task_id: str, body: AnswerBody):
     cfg = {"configurable": {"thread_id": task_id}}
     _graph.update_state(cfg, {"answers": answers, "waiting_for_answer": False})
     state = _graph.invoke(None, cfg)
+
+    # 任务完成时归档 + 提炼长期记忆
+    if state.get("next_action") == "done":
+        from memory import distill_from_task
+        distill_from_task(task_id, state)
+
     return _format_response(task_id, state)
