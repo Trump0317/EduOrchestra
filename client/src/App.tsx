@@ -12,7 +12,7 @@ interface TaskState {
   resources: { type: string; title: string; url: string; description?: string; knowledge_points?: string[] }[];
   questions: { id: string; content: string; options: string[]; kp: string }[];
   feedback: { summary: string; suggestion: string } | null;
-  next_action: string;
+  next_action: string;  // "next" | "repeat" | "done" | "replan"
   step_history: { step_index: number; rounds: number; best_accuracy: number; latest_accuracy: number }[];
 }
 
@@ -234,6 +234,11 @@ function ResultView({
           <>
             <p className="action-hint">正确率不够，再学一次</p>
             <button onClick={onContinue}>重新学习</button>
+          </>
+        ) : next_action === "replan" ? (
+          <>
+            <p className="action-hint">学习计划需要调整，正在重新规划...</p>
+            <button onClick={onContinue}>查看新计划</button>
           </>
         ) : (
           <>
