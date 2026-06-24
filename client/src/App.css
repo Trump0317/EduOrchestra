@@ -151,6 +151,20 @@ input[type="text"]:focus { border-color: #4a90d9; }
 .res-item:hover { background: #eef0f4; }
 .res-icon { font-size: 1.1rem; flex-shrink: 0; }
 
+/* ── Resource Detail (v0.6) ── */
+.res-content { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.res-title { font-weight: 500; }
+.res-desc { font-size: .78rem; color: #777; line-height: 1.4; }
+.res-kps { display: flex; gap: 5px; flex-wrap: wrap; }
+.kp-tag {
+  font-size: .7rem;
+  background: #e8f4fd;
+  color: #1a73e8;
+  padding: 1px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
 /* ── Practice ── */
 .q-item {
   margin-bottom: 1rem;

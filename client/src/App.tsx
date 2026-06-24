@@ -9,7 +9,7 @@ interface TaskState {
   status: "waiting_for_answer" | "completed";
   plan: { title: string; desc: string }[];
   current_step: number;
-  resources: { type: string; title: string; url: string }[];
+  resources: { type: string; title: string; url: string; description?: string; knowledge_points?: string[] }[];
   questions: { id: string; content: string; options: string[]; kp: string }[];
   feedback: { summary: string; suggestion: string } | null;
   next_action: string;
@@ -114,7 +114,17 @@ function ResourceView({
           {taskState.resources.map((r, i) => (
             <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="res-item">
               <span className="res-icon">{r.type === "video" ? "🎬" : "📄"}</span>
-              <span>{r.title}</span>
+              <div className="res-content">
+                <span className="res-title">{r.title}</span>
+                {r.description && <span className="res-desc">{r.description}</span>}
+                {r.knowledge_points && r.knowledge_points.length > 0 && (
+                  <div className="res-kps">
+                    {r.knowledge_points.map((kp, j) => (
+                      <span key={j} className="kp-tag">{kp}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </a>
           ))}
         </div>
@@ -350,7 +360,7 @@ function App() {
         )}
       </main>
 
-      <footer>EduOrchestra v0.5</footer>
+      <footer>EduOrchestra v0.6</footer>
     </div>
   );
 }
