@@ -350,7 +350,7 @@ function App() {
         )}
       </main>
 
-      <footer>EduOrchestra v0.4</footer>
+      <footer>EduOrchestra v0.5</footer>
     </div>
   );
 }

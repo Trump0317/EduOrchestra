@@ -10,7 +10,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "langchain>=0.3.0",
     "langchain-openai>=0.2.0",
-    "sqlalchemy>=2.0.0",
+    "sqlalchemy>=2.0.0",  # 预留：后续 SQLite checkpoint 持久化
     "python-dotenv>=1.0.0",
     "httpx>=0.28.0",
 ]

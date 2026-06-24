@@ -37,23 +37,19 @@
 ### Practice 判题逻辑
 
 ```python
-# server/tests/unit/test_practice.py
-# 测试 Practice Agent 的判题和题目读取逻辑
-from orchestrator.agents.practice import check_answer, load_questions
-
-def test_load_questions_by_kp():
-    """根据知识点 ID 加载题目"""
-    questions = load_questions(["kp-2-1"])
-    assert len(questions) > 0
-    assert all("content" in q for q in questions)
+# server/tests/unit/test_graph_structure.py
+# 判题逻辑（合并在 test_graph_structure.py 中）
+from orchestrator.agents.practice import check_answer, Question
 
 def test_check_answer_correct():
-    question = {"answer": "B"}
-    assert check_answer(question, "B") is True
+    q: Question = {"id": "q1", "content": "", "options": [],
+                   "answer": "B", "kp": ""}
+    assert check_answer(q, "B") is True
 
 def test_check_answer_wrong():
-    question = {"answer": "B"}
-    assert check_answer(question, "A") is False
+    q: Question = {"id": "q1", "content": "", "options": [],
+                   "answer": "B", "kp": ""}
+    assert check_answer(q, "A") is False
 ```
 
 ### 状态图结构
@@ -64,20 +60,20 @@ from orchestrator.graph import build_graph
 
 def test_graph_has_all_nodes():
     graph = build_graph()
-    nodes = graph.get_graph().nodes.keys()
-    assert "planner" in nodes
-    assert "resource" in nodes
-    assert "practice" in nodes
-    assert "analytics" in nodes
-    assert "feedback" in nodes
+    nodes = list(graph.get_graph().nodes.keys())
+    for name in ("assistant", "resource", "practice"):
+        assert name in nodes
 
-def test_graph_starts_from_planner():
+def test_graph_edge_chain():
     graph = build_graph()
-    edges = graph.get_graph().edges
-    # 有从 START 到 planner 的边
-    assert ("__start__", "planner") in edges or any(
-        src == "__start__" for src, _, _ in edges
+    edges = list(graph.get_graph().edges)
+    assert ("resource", "practice") in edges or any(
+        src == "resource" and dst == "practice" for src, dst, *_ in edges
     )
+
+def test_graph_interrupts_before_practice():
+    graph = build_graph()
+    assert "practice" in (graph.interrupt_after_nodes or [])
 ```
 
 ## 集成测试
@@ -85,20 +81,32 @@ def test_graph_starts_from_planner():
 每个 Agent 调真实 LLM，断言输出结构：
 
 ```python
-# server/tests/integration/test_planner.py
+# server/tests/integration/test_assistant.py
 # 调真实 LLM，断言返回结构
-from orchestrator.agents.planner import planner_node
-from orchestrator.state import AgentState
+from orchestrator.agents.assistant import assistant_node
 
-def test_planner_returns_steps():
-    """Planner Agent 应返回步骤序列"""
-    state = {"task_goal": "掌握二次函数"}
-    result = planner_node(state)
+def test_assistant_creates_plan():
+    """Assistant 首次调用 → 返回 plan + action=next"""
+    state = {
+        "task_id": "test-planner",
+        "task_goal": "掌握二次函数",
+        "plan": [],
+        "current_step": 0,
+        "step_history": [],
+        "resources": [],
+        "questions": [],
+        "waiting_for_answer": False,
+        "answers": [],
+        "feedback": None,
+        "next_action": "",
+    }
+    result = assistant_node(state)
     assert "plan" in result
     assert isinstance(result["plan"], list)
     assert len(result["plan"]) >= 1
     assert "title" in result["plan"][0]
     assert "desc" in result["plan"][0]
+    assert result["next_action"] == "next"
 ```
 
 ### 状态图分段测试
@@ -119,7 +127,7 @@ def test_workflow_to_practice():
     )
     # 断言跑到了 Practice 并等待答案
     assert state["waiting_for_answer"] is True
-    assert len(state["current_questions"]) > 0
+    assert len(state["questions"]) > 0
 
 def test_workflow_resume_after_answer():
     """提交答案后状态图应继续流转"""
@@ -134,7 +142,7 @@ def test_workflow_resume_after_answer():
     # 注入答案并 resume
     graph.update_state(config, {
         "answers": [{
-            "question_id": state["current_questions"][0]["id"],
+            "question_id": state["questions"][0]["id"],
             "student_answer": "B",
             "is_correct": True,
             "correct_answer": "B"
@@ -144,14 +152,16 @@ def test_workflow_resume_after_answer():
     state = graph.invoke(None, config)
 
     # 断言跑到了反馈
-    assert "feedback" in state
-    assert "analytics" in state
+    assert state["feedback"] is not None
+    assert state["next_action"] in ("repeat", "next")
 ```
 
-## Chat 集成测试
+## Chat 集成测试（v0.6+）
+
+> Chat Agent 尚未实现，以下为预留测试设计。
 
 ```python
-# server/tests/integration/test_chat.py
+# server/tests/integration/test_chat.py（预留）
 from orchestrator.agents.chat import chat_response
 
 def test_chat_with_task_context():
@@ -171,16 +181,13 @@ server/tests/
 ├── conftest.py                  ← 全局 fixtures
 ├── unit/
 │   ├── __init__.py
-│   ├── test_practice.py         ← 判题逻辑、题目加载
-│   └── test_graph_structure.py  ← 状态图节点和边
+│   └── test_graph_structure.py  ← 状态图节点+边 + 判题逻辑 + Agent 单元测试
 ├── integration/
 │   ├── __init__.py
-│   ├── test_planner.py          ← Planner + LLM
+│   ├── test_assistant.py        ← Assistant + LLM
 │   ├── test_resource.py         ← Resource + LLM
-│   ├── test_analytics.py        ← Analytics + LLM
-│   ├── test_feedback.py         ← Feedback + LLM
 │   ├── test_workflow.py         ← 状态图分段流转
-│   └── test_chat.py             ← Chat + LLM
-└── e2e/
-    └── test_full_flow.py        ← 完整学习循环
+│   ├── test_health.py           ← 健康检查 API
+│   ├── test_config_api.py       ← 配置 API
+│   └── test_task_api.py         ← 学习任务 API
 ```
