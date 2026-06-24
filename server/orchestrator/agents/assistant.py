@@ -1,85 +1,92 @@
-"""Assistant Agent — LLM 智能路由器。
+"""Assistant Agent — LLM 智能路由器（Tool Calling 模式）。
 
-读取全局状态（plan + feedback + step_history + answers），
-由 LLM 做出有教学意义的路由决策。
-
-不再承担计划制定（Planner）和答题诊断（Feedback）职责。
+v0.9: 使用 bind_tools + 工具调用循环，支持 save_memory / read_memory。
 """
 
 import json
 
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+
 from orchestrator.state import AgentState
-from orchestrator.llm import llm_invoke_json
+from orchestrator.llm import get_llm
 from orchestrator.prompt import render_prompt
+from memory import MEMORY_TOOLS, save_memory, read_memory
+
+_TOOL_MAP = {"save_memory": save_memory, "read_memory": read_memory}
+_MAX_TOOL_ITERATIONS = 3
 
 
-def _format_answers(answers: list[dict]) -> str:
-    if not answers:
-        return "无答题记录"
-    lines = []
-    for i, a in enumerate(answers):
-        status = "✅" if a.get("is_correct") else "❌"
-        lines.append(
-            f"  {status} 题{i + 1}: 学生选 {a.get('student_answer', '?')}"
-            f"（正确: {a.get('correct_answer', '?')}）"
-        )
-    return "\n".join(lines)
-
-
-def _format_step_history(records: list[dict]) -> str:
-    if not records:
-        return "首次学习本步骤"
-    lines = []
-    for r in records:
-        lines.append(
-            f"  第{r.get('rounds', '?')}轮: "
-            f"正确率 {r.get('latest_accuracy', 0):.0%}"
-        )
-    return "\n".join(lines)
-
-
-def assistant_node(state: AgentState) -> dict:
-    """LLM 分析全局状态，决定下一步：repeat / next / done。
-
-    被调用两次：
-    1. Planner 之后 — 此时无 feedback/answers，应决定开始学习
-    2. Feedback 之后 — 有完整上下文，做智能路由
-    """
+def _build_context_json(state: AgentState) -> str:
+    """构建 HumanMessage 中的上下文 JSON。"""
     plan = state.get("plan", [])
     step_index = state.get("current_step", 0)
-    total_steps = len(plan)
+    step = plan[step_index] if step_index < len(plan) else None
     feedback = state.get("feedback")
     answers = state.get("answers", [])
     history = state.get("step_history", [])
-
-    step = plan[step_index] if step_index < total_steps else None
     step_records = [h for h in history if h.get("step_index") == step_index]
 
-    prompt = render_prompt(
-        "assistant",
-        task_goal=state["task_goal"],
-        total_steps=total_steps,
-        current_step=step_index + 1,
-        step_title=step["title"] if step else "（尚未开始）",
-        step_desc=step.get("desc", "") if step else "",
-        plan_summary=json.dumps(
-            [f"{i+1}. {s['title']}" for i, s in enumerate(plan)],
-            ensure_ascii=False,
-        ),
-        has_feedback="是" if feedback else "否",
-        feedback_text=json.dumps(feedback, ensure_ascii=False)
-        if feedback
-        else "无（首次启动，请直接决定开始学习）",
-        step_history_text=_format_step_history(step_records),
-        answers_text=_format_answers(answers),
-        current_rounds=len(step_records) + 1 if step else 0,
-    )
-    result = llm_invoke_json(prompt)
-    # LLM 输出: {"action": "next"|"repeat"|"done", "reason": "..."}
+    # 答题统计
+    total_q = len(answers)
+    correct_q = sum(1 for a in answers if a.get("is_correct"))
+    accuracy = f"{correct_q / total_q:.0%}" if total_q > 0 else "无"
 
-    update: dict = {
-        "next_action": result["action"],
+    context = {
+        "task_goal": state["task_goal"],
+        "total_steps": len(plan),
+        "current_step": step_index + 1,
+        "step_title": step["title"] if step else "（尚未开始）",
+        "step_desc": step.get("desc", "") if step else "",
+        "plan_summary": [f"{i+1}. {s['title']}" for i, s in enumerate(plan)],
+        "has_feedback": feedback is not None,
+        "feedback": feedback,
+        "current_rounds": len(step_records) + 1 if step else 0,
+        "accuracy": accuracy,
+        "answers": [
+            {
+                "q": a.get("question_id", ""),
+                "student": a.get("student_answer", ""),
+                "correct": a.get("is_correct", False),
+                "answer": a.get("correct_answer", ""),
+            }
+            for a in answers
+        ],
+        "step_history_summary": [
+            {
+                "step": h["step_index"],
+                "rounds": h["rounds"],
+                "accuracy": f"{h['latest_accuracy']:.0%}",
+            }
+            for h in step_records
+        ],
     }
+    return json.dumps(context, ensure_ascii=False, indent=2)
+
+
+def _parse_decision(content: str) -> dict:
+    """从 LLM 最终回答中解析路由决策。"""
+    content = content.strip()
+    # 去掉 markdown 代码块
+    if "```" in content:
+        lines = content.split("\n")
+        lines = [l for l in lines if not l.startswith("```")]
+        content = "\n".join(lines).strip()
+    # 提取 JSON 对象
+    import re
+    match = re.search(r"\{.*\}", content, re.DOTALL)
+    if match:
+        content = match.group()
+    return json.loads(content)
+
+
+def _build_update(state: AgentState, decision: dict) -> dict:
+    """根据 LLM 决策构建状态更新。"""
+    step_index = state.get("current_step", 0)
+    answers = state.get("answers", [])
+    history = state.get("step_history", [])
+    step_records = [h for h in history if h.get("step_index") == step_index]
+
+    update: dict = {"next_action": decision.get("action", "next")}
 
     # 更新 step_history
     if answers:
@@ -98,8 +105,55 @@ def assistant_node(state: AgentState) -> dict:
         filtered = [h for h in history if h.get("step_index") != step_index]
         update["step_history"] = filtered + [new_record]
 
-    # 步骤推进（仅答题后，首次调用不推进）
-    if result["action"] == "next" and answers:
+    # 步骤推进（仅答题后）
+    if decision["action"] == "next" and answers:
         update["current_step"] = step_index + 1
 
     return update
+
+
+def assistant_node(state: AgentState) -> dict:
+    """LLM 分析全局状态，可调用工具，最终做出路由决策。
+
+    流程:
+    1. 构建 SystemMessage + HumanMessage（含上下文 + 已有记忆）
+    2. LLM 思考 → 可能 tool_call → 执行工具 → 循环
+    3. 最终回答 → 解析 JSON → 路由决策
+    """
+    llm = get_llm().bind_tools(MEMORY_TOOLS)
+
+    system = SystemMessage(content=render_prompt("assistant"))
+    context = HumanMessage(content=_build_context_json(state))
+
+    # 注入已有记忆
+    memory_text = read_memory.invoke({"prefix": ""})
+    memory_hint = HumanMessage(
+        content=f"## 已有的长期记忆（来自之前的学习）\n{memory_text}"
+    )
+
+    messages = [system, memory_hint, context]
+
+    for _ in range(_MAX_TOOL_ITERATIONS):
+        response = llm.invoke(messages)
+        messages.append(response)
+
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                tool_func = _TOOL_MAP[tc["name"]]
+                result = tool_func.invoke(tc["args"])
+                messages.append(
+                    ToolMessage(content=str(result), tool_call_id=tc["id"])
+                )
+            continue
+        else:
+            try:
+                decision = _parse_decision(response.content)
+            except (json.JSONDecodeError, ValueError) as e:
+                # 兜底：解析失败时默认 next
+                print(f"[Assistant] JSON 解析失败: {e}")
+                print(f"[Assistant] 原始输出: {response.content[:200]}")
+                decision = {"action": "next", "reason": "解析失败"}
+            return _build_update(state, decision)
+
+    # 兜底：超过最大迭代次数
+    return {"next_action": "next"}

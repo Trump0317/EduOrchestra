@@ -10,7 +10,8 @@
 # - test_graph_edge_chain: 核心边存在
 # - test_graph_interrupts_before_practice: practice 在 interrupt_after 中
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from langchain_core.messages import AIMessage
 
 from orchestrator.agents.assistant import assistant_node
 from orchestrator.agents.resource import resource_node
@@ -36,27 +37,35 @@ def make_base_state(**overrides) -> dict:
     return state
 
 
-# ── Assistant 单元测试（v0.7: 纯路由） ──
+# ── Assistant 单元测试（v0.9: Tool Calling） ──
+
+def _mock_llm_response(action: str, reason: str = "测试"):
+    """构造模拟的 LLM 响应（AIMessage 无 tool_calls）。"""
+    import json
+    msg = AIMessage(content=json.dumps({"action": action, "reason": reason}))
+    msg.tool_calls = []
+    return msg
+
 
 def test_assistant_routes_first_call():
     """首次调用（无 feedback）：mock LLM 返回 action=next"""
-    mock = {"action": "next", "reason": "开始学习第一步"}
     state = make_base_state(
         plan=[{"title": "理解概念", "desc": "学习基本定义"}],
         current_step=0,
         answers=[],
         feedback=None,
     )
-    with patch("orchestrator.agents.assistant.llm_invoke_json", return_value=mock):
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = _mock_llm_response("next", "开始学习")
+    with patch("orchestrator.agents.assistant.get_llm") as mock_get:
+        mock_get.return_value.bind_tools.return_value = mock_llm
         result = assistant_node(state)
     assert result["next_action"] == "next"
-    # 首次无答案，current_step 不变
     assert "current_step" not in result
 
 
 def test_assistant_routes_with_feedback():
     """答题后（有 feedback）：mock LLM 做路由决策"""
-    mock = {"action": "next", "reason": "掌握良好，进入下一步"}
     state = make_base_state(
         plan=[{"title": "理解概念", "desc": "学习定义"}],
         current_step=0,
@@ -68,7 +77,10 @@ def test_assistant_routes_with_feedback():
                   "weaknesses": [], "suggestion": "继续"},
         step_history=[],
     )
-    with patch("orchestrator.agents.assistant.llm_invoke_json", return_value=mock):
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = _mock_llm_response("next", "掌握良好")
+    with patch("orchestrator.agents.assistant.get_llm") as mock_get:
+        mock_get.return_value.bind_tools.return_value = mock_llm
         result = assistant_node(state)
     assert result["next_action"] == "next"
     assert result["current_step"] == 1
