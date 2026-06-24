@@ -2,41 +2,39 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from orchestrator.state import AgentState
-from orchestrator.agents.planner import planner_node
+from orchestrator.agents.assistant import assistant_node
 from orchestrator.agents.resource import resource_node
 from orchestrator.agents.practice import practice_node
-from orchestrator.agents.analytics import analytics_node
-from orchestrator.agents.feedback import feedback_node
 
 
-def decide_next(state: AgentState) -> str:
-    """条件路由：根据 next_action 决定跳转"""
+def decide_route(state: AgentState) -> str:
+    """Planner 输出 next/repeat → resource → practice
+       Planner 输出 done → END"""
     action = state.get("next_action", "")
-    if action == "repeat_step":
-        return "planner"
-    if action == "next_step":
-        if state["current_step"] < len(state["plan"]):
-            return "resource"
+    if action == "done":
         return END
-    return END
+    return "resource"
 
 
 def build_graph() -> StateGraph:
-    """构建 LangGraph 状态图，在 practice 前中断"""
     graph = StateGraph(AgentState)
 
-    graph.add_node("planner", planner_node)
+    graph.add_node("assistant", assistant_node)
     graph.add_node("resource", resource_node)
     graph.add_node("practice", practice_node)
-    graph.add_node("analyze", analytics_node)
-    graph.add_node("report", feedback_node)
 
-    graph.add_edge("planner", "resource")
+    graph.set_entry_point("assistant")
+
+    # planner → decide → resource or END
+    graph.add_conditional_edges("assistant", decide_route)
+
+    # resource → practice
     graph.add_edge("resource", "practice")
-    graph.add_edge("practice", "analyze")
-    graph.add_edge("analyze", "report")
-    graph.add_conditional_edges("report", decide_next)
 
-    graph.set_entry_point("planner")
+    # practice → planner（答题完成后回到主管审查）
+    graph.add_edge("practice", "assistant")
 
-    return graph.compile(checkpointer=MemorySaver(), interrupt_after=["practice"])
+    return graph.compile(
+        checkpointer=MemorySaver(),
+        interrupt_after=["practice"],
+    )

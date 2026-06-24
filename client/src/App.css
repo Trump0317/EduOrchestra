@@ -1,46 +1,188 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  background: #f5f5f5;
-  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  line-height: 1.6;
 }
 
 .app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+header h1 { font-size: 1.5rem; }
+.subtitle { color: #888; font-size: 0.8rem; }
+
+footer {
+  text-align: center;
+  padding: 2rem 0;
+  color: #bbb;
+  font-size: 0.75rem;
+  margin-top: auto;
+}
+
+/* ── Card ── */
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.4rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.card h2 { font-size: 1.2rem; margin-bottom: .25rem; }
+.card h3 { font-size: 1rem; margin-bottom: .5rem; }
+.card.center { text-align: center; }
+.hint { color: #999; font-size: .82rem; margin-bottom: .75rem; }
+
+/* ── Buttons ── */
+button {
+  width: 100%;
+  padding: .7rem 1rem;
+  font-size: .95rem;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s;
+  margin-top: .5rem;
+}
+button:hover:not(:disabled) { background: #357abd; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Input ── */
+input[type="text"] {
+  width: 100%;
+  padding: .7rem .9rem;
+  font-size: .95rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+}
+input[type="text"]:focus { border-color: #4a90d9; }
+
+/* ── Spinner ── */
+.spinner {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 4rem 0;
+}
+.spinner-icon {
+  width: 36px; height: 36px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #4a90d9;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner p { margin-top: .75rem; color: #888; font-size: .9rem; }
+
+/* ── Step Dots ── */
+.step-dots {
+  display: flex;
   justify-content: center;
-  min-height: 100vh;
-  gap: 1rem;
+  gap: .5rem;
+  margin-bottom: .75rem;
 }
-
-h1 {
-  font-size: 2.5rem;
-  color: #1a1a1a;
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #ddd;
+  transition: background .3s;
 }
+.dot.done { background: #4a90d9; }
+.dot.active { background: #1a1a2e; }
 
-p {
-  font-size: 1.1rem;
-  color: #666;
-}
-
-.status {
-  margin-top: 1rem;
-  font-size: 1rem;
-}
-
-.status .ok {
-  color: #22c55e;
+/* ── Step Label ── */
+.step-label {
+  display: inline-block;
+  background: #eef2ff;
+  color: #4a90d9;
+  padding: .2rem .75rem;
+  border-radius: 12px;
+  font-size: .8rem;
   font-weight: 600;
+  margin-bottom: .4rem;
 }
+.step-desc { color: #888; font-size: .85rem; margin-top: .3rem; }
 
-.status .error {
-  color: #ef4444;
-  font-weight: 600;
+/* ── Plan ── */
+.plan-list { list-style: none; padding: 0; text-align: left; }
+.plan-list li {
+  display: flex; gap: .75rem; align-items: flex-start;
+  padding: .6rem 0;
+  border-bottom: 1px solid #f0f0f0;
 }
+.plan-list li:last-child { border-bottom: none; }
+.plan-num {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #4a90d9;
+  color: #fff;
+  font-size: .8rem; font-weight: 600;
+  flex-shrink: 0; margin-top: 2px;
+}
+.plan-list strong { display: block; font-size: .95rem; }
+.plan-list p { color: #777; font-size: .82rem; margin-top: .1rem; }
+
+/* ── Resources ── */
+.resource-list { display: flex; flex-direction: column; gap: .4rem; }
+.res-item {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .55rem .75rem;
+  background: #f7f8fa;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #333;
+  font-size: .88rem;
+}
+.res-item:hover { background: #eef0f4; }
+.res-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+/* ── Practice ── */
+.q-item {
+  margin-bottom: 1rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid #eee;
+}
+.q-item:last-child { border-bottom: none; margin-bottom: .5rem; }
+.q-text { font-weight: 500; margin-bottom: .5rem; font-size: .93rem; }
+.opts { display: flex; flex-direction: column; gap: .35rem; }
+.opt {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem .7rem;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .88rem;
+}
+.opt:hover { border-color: #bbb; background: #fafafa; }
+.opt.sel { border-color: #4a90d9; background: #eef5ff; }
+.opt input[type="radio"] { display: none; }
+
+/* ── Result ── */
+.stats { display: flex; gap: 1.5rem; justify-content: center; margin: .75rem 0; }
+.stat { display: flex; flex-direction: column; align-items: center; }
+.stat-val { font-size: 1.5rem; font-weight: 700; color: #4a90d9; }
+.stat-lbl { font-size: .78rem; color: #999; }
+.fb-summary { font-size: .95rem; font-weight: 500; margin-bottom: .4rem; }
+.fb-suggestion {
+  color: #555; font-size: .85rem;
+  padding: .5rem .7rem;
+  background: #f0f7ff;
+  border-radius: 8px;
+}
+.action-hint { font-size: .9rem; margin-bottom: .25rem; color: #555; }
+.next-preview { font-size: .85rem; color: #999; margin-bottom: .25rem; }
