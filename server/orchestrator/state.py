@@ -1,26 +1,24 @@
 """LangGraph 共享状态定义。
 
-核心约束：只有 feedback 节点能修改 current_step，其余节点只读。
+Planner 作为全局主管，消费和更新 step_history。
+next_action 由 Planner 写入，decide_route 读取做路由。
 """
 
 from typing import TypedDict, Optional
 
 
 class PlanStep(TypedDict):
-    """计划中的一个学习步骤"""
     title: str
     desc: str
 
 
 class ResourceEntry(TypedDict):
-    """一条学习资料"""
     type: str        # "video" | "article"
     title: str
     url: str
 
 
 class Question(TypedDict):
-    """一道练习题"""
     id: str
     content: str
     options: list[str]
@@ -29,27 +27,37 @@ class Question(TypedDict):
 
 
 class Answer(TypedDict):
-    """学生提交的一道答案"""
     question_id: str
     student_answer: str
     is_correct: bool
     correct_answer: str
 
 
-class AgentState(TypedDict):
-    """LangGraph 共享状态。
+class StepRecord(TypedDict):
+    """每个步骤的学习记录，Planner 用于判断进度。"""
+    step_index: int
+    rounds: int              # 本步做了几轮
+    best_accuracy: float     # 本步最佳正确率
+    latest_accuracy: float   # 本步最新正确率
 
-    只有 feedback 节点能修改 current_step，其余节点只读。
-    next_action 由 feedback 写入，decide_next 读取做路由。
-    """
+
+class AgentState(TypedDict):
     task_id: str
     task_goal: str
     plan: list[PlanStep]
     current_step: int
+
+    # 每个步骤的学习记录
+    step_history: list[StepRecord]
+
+    # 执行层产出
     resources: list[ResourceEntry]
     questions: list[Question]
+
+    # 答题交互
     waiting_for_answer: bool
     answers: list[Answer]
-    analytics: Optional[dict]
-    feedback: Optional[dict]
-    next_action: str
+
+    # Planner 主管层产出
+    feedback: Optional[dict]   # {summary, suggestion}
+    next_action: str            # "repeat" | "next" | "done"

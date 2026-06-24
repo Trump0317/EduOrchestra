@@ -1,19 +1,14 @@
 """
-EduOrchestra 演示脚本 — 调真实 LLM，跑通全链路 + repeat 循环。
+EduOrchestra 演示脚本 — Planner 全局主管模式。
 
 用法：
     cd server && python demo.py
 
 流程：
-    1. 输入学习目标 → Planner 拆解步骤
-    2. Resource 推荐资料
-    ┌─ 循环直到全部步骤完成 ──────────────────────┐
-    │  3. Practice 出题 → 等待你作答               │
-    │  4. Analytics 分析薄弱点                     │
-    │  5. Feedback 决定下一步                      │
-    │     • repeat_step → 回到第 3 步（重学当前步）│
-    │     • next_step   → 进入下一步（回到第 2 步）│
-    └─────────────────────────────────────────────┘
+    Planner → Resource → Practice(中断)
+        ↑                              │
+        └──── repeat/next ────────────┘ (Planner 决策)
+                                  done → END
 """
 
 import uuid
@@ -29,29 +24,28 @@ def print_sep(title: str):
 
 
 def show_plan(state: dict):
-    """显示学习计划"""
     print_sep("🧠 Planner — 学习计划")
     for i, step in enumerate(state["plan"]):
-        print(f"  Step {i+1}: {step['title']}")
-        print(f"           {step['desc']}")
+        print(f"  {i + 1}. {step['title']}")
+        print(f"     {step['desc']}")
 
 
-def show_resources(state: dict):
-    """显示当前步骤的学习资料"""
-    title = state["plan"][state["current_step"]]["title"]
-    print_sep(f"📚 Resource — 步骤「{title}」的资料")
+def show_resources_and_questions(state: dict):
+    step = state["plan"][state["current_step"]]
+    print_sep(f"📚 第 {state['current_step'] + 1} 步「{step['title']}」")
+    print(f"  {step['desc']}")
+    print()
     for r in state.get("resources", []):
         print(f"  [{r['type']}] {r['title']}")
         print(f"          {r['url']}")
 
 
-def show_questions(state: dict) -> list[dict]:
-    """展示题目，收集学生答案，返回答案列表"""
-    print_sep("✏️  Practice — 做题（输入选项字母）")
+def collect_answers(state: dict) -> list[dict]:
+    print_sep("✏️  练习题")
     questions = state.get("questions", [])
     answers = []
     for q in questions:
-        print(f"\n  Q: {q['content']}")
+        print(f"\n  {q['content']}")
         for opt in q["options"]:
             print(f"     {opt}")
         student = input("  你的答案: ").strip().upper()
@@ -66,54 +60,52 @@ def show_questions(state: dict) -> list[dict]:
     return answers
 
 
-def show_analytics(state: dict):
-    """显示学情分析"""
-    stats = state.get("analytics", {})
-    print_sep("📊 Analytics — 学情分析")
-    print(f"  答题: {stats.get('correct_count', 0)}/{stats.get('total_questions', 0)} 正确")
-    print(f"  正确率: {stats.get('accuracy', 0):.0%}")
-    if stats.get("weak_points"):
-        print(f"  薄弱点: {', '.join(stats['weak_points'])}")
-    if stats.get("summary"):
-        print(f"  分析: {stats['summary']}")
-
-
 def show_feedback(state: dict):
-    """显示反馈并返回 next_action"""
     fb = state.get("feedback", {})
+    print_sep("🧠 Planner 反馈")
+    if fb.get("summary"):
+        print(f"  {fb['summary']}")
+    if fb.get("suggestion"):
+        print(f"  💡 {fb['suggestion']}")
+
     action = state.get("next_action", "")
-    print_sep("💡 Feedback — 反馈与建议")
-    if fb:
-        print(f"  总结: {fb.get('summary', '')}")
-        print(f"  建议: {fb.get('suggestion', '')}")
-    if action == "repeat_step":
+    plan = state.get("plan", [])
+    step = state.get("current_step", 0)
+    history = state.get("step_history", [])
+
+    # 显示本轮统计
+    if history:
+        last = history[-1]
+        acc = last.get("latest_accuracy", 0)
+        rounds = last.get("rounds", "?")
+        print()
+        print(f"  正确率: {acc:.0%}  |  本步第 {rounds} 轮")
+
+    if action == "repeat":
         print("  ➡️  决定: 重新学习当前步骤 🔄")
-    elif action == "next_step":
-        step_idx = state.get("current_step", 0)
-        plan = state.get("plan", [])
-        if step_idx < len(plan):
-            print(f"  ➡️  决定: 进入下一步「{plan[step_idx]['title']}」✅")
+    elif action == "next":
+        if step < len(plan):
+            next_title = plan[step]["title"] if step < len(plan) else ""
+            print(f"  ➡️  决定: 进入下一步「{next_title}」✅")
         else:
-            print("  ➡️  决定: 全部完成 🎉")
-    return action
+            print("  ➡️  决定: 进入下一步 ✅")
+    elif action == "done":
+        print("  🎉 全部完成！")
 
 
 def demo():
     print("=" * 60)
-    print("  EduOrchestra — 多智能体数学学习助手")
+    print("  EduOrchestra — Planner 主管模式")
     print("=" * 60)
 
     from config import config
     missing = config.validate()
     if missing:
         print(f"\n⚠️  缺少配置: {', '.join(missing)}")
-        print("   请先编辑 .env 文件填入 LLM_API_KEY")
         return
-
     print(f"  模型: {config.LLM_PROVIDER} / {config.LLM_MODEL}")
-    print(f"  API Key: {'✅ 已配置' if config.LLM_API_KEY else '❌ 缺失'}")
 
-    goal = input("\n📝 输入学习目标（如「掌握二次函数」）: ").strip()
+    goal = input("\n📝 输入学习目标: ").strip()
     if not goal:
         goal = "掌握二次函数"
         print(f"  使用默认目标: {goal}")
@@ -122,19 +114,19 @@ def demo():
     graph = build_graph()
     cfg = {"configurable": {"thread_id": thread_id}}
 
-    # ── 首次调用：planner → resource → practice（中断）──
-    print("\n  ⏳ 正在生成学习计划...")
+    # 首次调用
+    print("\n  ⏳ Planner 正在制定计划...")
     state = graph.invoke(
         {
             "task_id": f"task-{thread_id}",
             "task_goal": goal,
             "plan": [],
             "current_step": 0,
+            "step_history": [],
             "resources": [],
             "questions": [],
             "waiting_for_answer": False,
             "answers": [],
-            "analytics": None,
             "feedback": None,
             "next_action": "",
         },
@@ -142,38 +134,21 @@ def demo():
     )
 
     show_plan(state)
-    show_resources(state)
 
-    # ── 答题循环：直到图结束 ──
-    round_num = 1
+    # 答题循环
     while state.get("waiting_for_answer"):
-        print(f"\n{'─' * 60}")
-        print(f"  第 {round_num} 轮答题")
+        show_resources_and_questions(state)
+        answers = collect_answers(state)
 
-        # 答题
-        answers = show_questions(state)
-
-        # 注入答案，恢复执行
         graph.update_state(cfg, {"answers": answers, "waiting_for_answer": False})
 
-        print("\n  ⏳ 正在分析...")
+        print("\n  ⏳ Planner 正在分析...")
         state = graph.invoke(None, cfg)
 
-        show_analytics(state)
-        action = show_feedback(state)
+        show_feedback(state)
 
-        round_num += 1
-
-        # 如果图已经结束，退出循环
-        if not state.get("waiting_for_answer"):
-            break
-
-    # ── 完成 ──
     print()
     print("=" * 60)
-    plan = state.get("plan", [])
-    current = state.get("current_step", len(plan))
-    print(f"  完成进度: {current}/{len(plan)} 个步骤")
     print("  Demo 完成！🎉")
     print("=" * 60)
 

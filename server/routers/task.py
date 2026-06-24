@@ -49,9 +49,11 @@ def _format_response(task_id: str, state: dict) -> dict:
             }
             for q in state.get("questions", [])
         ],
-        "analytics": state.get("analytics"),
         "feedback": state.get("feedback"),
         "next_action": state.get("next_action", ""),
+        # 前端用于显示答题统计
+        "step_history": state.get("step_history", []),
+        "current_answers": state.get("answers", []),
     }
 
 

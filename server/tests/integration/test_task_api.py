@@ -5,7 +5,7 @@
 # - test_get_task_404: 不存在的 task_id → 404
 # - test_submit_answers: POST /api/task/{id}/answer → 200 + analytics 非空
 # - test_repeat_loop: 全答错 → 仍 waiting_for_answer（repeat 循环）
-# - test_complete: 全答对 → next_action=next_step
+# - test_complete: 全答对 → next_action=next
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -85,11 +85,11 @@ async def test_submit_answers():
         )
         assert resp2.status_code == 200
         data = resp2.json()
-        assert data["analytics"] is not None
-        assert data["analytics"]["total_questions"] == len(answers)
+        assert data["feedback"] is not None
+        
         assert data["feedback"] is not None
         assert data["feedback"]["summary"] is not None
-        assert data["next_action"] in ("repeat_step", "next_step")
+        assert data["next_action"] in ("repeat", "next")
 
 
 @pytest.mark.asyncio
@@ -113,14 +113,14 @@ async def test_repeat_loop():
         )
         assert resp2.status_code == 200
         data = resp2.json()
-        assert data["next_action"] == "repeat_step"
+        assert data["next_action"] == "repeat"
         assert data["status"] == "waiting_for_answer"
         assert len(data["questions"]) > 0
 
 
 @pytest.mark.asyncio
 async def test_complete():
-    """全部答对 → next_action=next_step"""
+    """全部答对 → next_action=next"""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
@@ -141,5 +141,5 @@ async def test_complete():
         )
         assert resp2.status_code == 200
         data = resp2.json()
-        assert data["next_action"] in ("repeat_step", "next_step")
-        assert data["analytics"] is not None
+        assert data["next_action"] in ("repeat", "next")
+        assert data["feedback"] is not None

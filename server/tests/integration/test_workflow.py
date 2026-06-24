@@ -1,12 +1,27 @@
 # server/tests/integration/test_workflow.py
 # 测试行为：
 # - test_workflow_runs_to_practice: invoke → waiting=True, plan/resources/questions 非空
-# - test_workflow_resume_after_answer: update_state 注入答案后 invoke(None) → analytics/feedback 非空
-# - test_workflow_repeat_on_all_wrong: 全答错 → next_action="repeat_step"
-# - test_workflow_completes_on_all_correct: 全答对 → next_action="next_step"
+# - test_workflow_resume_after_answer: update_state 注入答案后 invoke(None) → feedback 非空
+# - test_workflow_repeat_on_all_wrong: 全答错 → next_action="repeat"
+# - test_workflow_completes_on_all_correct: 全答对 → next_action="next"
 
 from orchestrator.graph import build_graph
 from orchestrator.agents.practice import check_answer
+
+
+INIT = {
+    "task_id": "",
+    "task_goal": "掌握二次函数",
+    "plan": [],
+    "current_step": 0,
+    "step_history": [],
+    "resources": [],
+    "questions": [],
+    "waiting_for_answer": False,
+    "answers": [],
+    "feedback": None,
+    "next_action": "",
+}
 
 
 def test_workflow_runs_to_practice():
@@ -14,96 +29,46 @@ def test_workflow_runs_to_practice():
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-1"}}
 
-    state = graph.invoke(
-        {
-            "task_id": "test-1",
-            "task_goal": "掌握二次函数",
-            "plan": [],
-            "current_step": 0,
-            "resources": [],
-            "questions": [],
-            "waiting_for_answer": False,
-            "answers": [],
-            "analytics": None,
-            "feedback": None,
-            "next_action": "",
-        },
-        config,
-    )
+    state = graph.invoke(dict(INIT, task_id="test-1"), config)
 
     assert state["waiting_for_answer"] is True
     assert len(state["questions"]) > 0
     assert len(state["plan"]) >= 2
     assert len(state["resources"]) > 0
-    assert state.get("analytics") is None  # 还未执行
 
 
 def test_workflow_resume_after_answer():
-    """注入答案后 invoke(None) → analytics/feedback 非空"""
+    """注入答案后 invoke(None) → feedback 非空"""
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-2"}}
 
-    # 第一段
-    state = graph.invoke(
-        {
-            "task_id": "test-2",
-            "task_goal": "掌握二次函数",
-            "plan": [],
-            "current_step": 0,
-            "resources": [],
-            "questions": [],
-            "waiting_for_answer": False,
-            "answers": [],
-            "analytics": None,
-            "feedback": None,
-            "next_action": "",
-        },
-        config,
-    )
+    state = graph.invoke(dict(INIT, task_id="test-2"), config)
 
-    # 构造答案（第一题对，第二题错）
     answers = []
     for q in state["questions"]:
-        is_correct = True if len(answers) == 0 else False
-        student_answer = q["answer"] if is_correct else ("A" if q["answer"] != "A" else "B")
+        is_correct = len(answers) == 0
+        student = q["answer"] if is_correct else ("A" if q["answer"] != "A" else "B")
         answers.append({
             "question_id": q["id"],
-            "student_answer": student_answer,
-            "is_correct": check_answer(q, student_answer),
+            "student_answer": student,
+            "is_correct": check_answer(q, student),
             "correct_answer": q["answer"],
         })
 
     graph.update_state(config, {"answers": answers, "waiting_for_answer": False})
-
     state = graph.invoke(None, config)
 
-    assert state["analytics"] is not None
-    assert state["analytics"]["total_questions"] == len(answers)
     assert state["feedback"] is not None
-    assert state["next_action"] in ("repeat_step", "next_step")
+    assert state["feedback"].get("summary") is not None
+    assert state["next_action"] in ("repeat", "next")
 
 
 def test_workflow_repeat_on_all_wrong():
-    """全答错 → next_action = repeat_step"""
+    """全答错 → next_action = repeat"""
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-3"}}
 
-    state = graph.invoke(
-        {
-            "task_id": "test-3",
-            "task_goal": "掌握二次函数",
-            "plan": [],
-            "current_step": 0,
-            "resources": [],
-            "questions": [],
-            "waiting_for_answer": False,
-            "answers": [],
-            "analytics": None,
-            "feedback": None,
-            "next_action": "",
-        },
-        config,
-    )
+    state = graph.invoke(dict(INIT, task_id="test-3"), config)
 
     wrong_answers = []
     for q in state["questions"]:
@@ -116,32 +81,16 @@ def test_workflow_repeat_on_all_wrong():
         })
 
     graph.update_state(config, {"answers": wrong_answers, "waiting_for_answer": False})
-
     state = graph.invoke(None, config)
-    assert state["next_action"] == "repeat_step"
+    assert state["next_action"] == "repeat"
 
 
 def test_workflow_completes_on_all_correct():
-    """全答对 → next_action = next_step"""
+    """全答对 → next_action = next"""
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-4"}}
 
-    state = graph.invoke(
-        {
-            "task_id": "test-4",
-            "task_goal": "掌握二次函数",
-            "plan": [],
-            "current_step": 0,
-            "resources": [],
-            "questions": [],
-            "waiting_for_answer": False,
-            "answers": [],
-            "analytics": None,
-            "feedback": None,
-            "next_action": "",
-        },
-        config,
-    )
+    state = graph.invoke(dict(INIT, task_id="test-4"), config)
 
     correct_answers = []
     for q in state["questions"]:
@@ -153,6 +102,5 @@ def test_workflow_completes_on_all_correct():
         })
 
     graph.update_state(config, {"answers": correct_answers, "waiting_for_answer": False})
-
     state = graph.invoke(None, config)
-    assert state["next_action"] == "next_step"
+    assert state["next_action"] == "next"
