@@ -16,6 +16,8 @@ class ResourceEntry(TypedDict):
     type: str        # "video" | "article"
     title: str
     url: str
+    description: str          # v0.6: 资料简介 (30-80 字)
+    knowledge_points: list[str]  # v0.6: 关联知识点 (1-3 个)
 
 
 class Question(TypedDict):

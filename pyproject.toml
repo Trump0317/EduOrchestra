@@ -13,6 +13,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",  # 预留：后续 SQLite checkpoint 持久化
     "python-dotenv>=1.0.0",
     "httpx>=0.28.0",
+    "duckduckgo-search>=8.0",  # v0.6: 真实网络搜索
 ]
 
 [project.optional-dependencies]
