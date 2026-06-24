@@ -10,9 +10,14 @@ from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from orchestrator.state import AgentState
 from orchestrator.llm import get_llm
 from orchestrator.prompt import render_prompt
-from memory import MEMORY_TOOLS, save_memory, read_memory
+from orchestrator.tools import ASSISTANT_TOOLS, search_web, fetch_page, save_memory, read_memory
 
-_TOOL_MAP = {"save_memory": save_memory, "read_memory": read_memory}
+_TOOL_MAP = {
+    "save_memory": save_memory,
+    "read_memory": read_memory,
+    "search_web": search_web,
+    "fetch_page": fetch_page,
+}
 _MAX_TOOL_ITERATIONS = 3
 
 
@@ -120,7 +125,7 @@ def assistant_node(state: AgentState) -> dict:
     2. LLM 思考 → 可能 tool_call → 执行工具 → 循环
     3. 最终回答 → 解析 JSON → 路由决策
     """
-    llm = get_llm().bind_tools(MEMORY_TOOLS)
+    llm = get_llm().bind_tools(ASSISTANT_TOOLS)
 
     system = SystemMessage(content=render_prompt("assistant"))
     context = HumanMessage(content=_build_context_json(state))

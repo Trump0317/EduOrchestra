@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 
-from memory import get_profile, read_memory
+from memory import get_profile, raw_read_memory
 
 router = APIRouter(prefix="/api/progress", tags=["progress"])
 
@@ -16,4 +16,4 @@ def get_progress():
 @router.get("/memory")
 def get_memories(prefix: str = Query("", description="前缀过滤，如 weakness:")):
     """读取长期记忆。"""
-    return {"memories": read_memory.invoke({"prefix": prefix})}
+    return {"memories": raw_read_memory(prefix)}

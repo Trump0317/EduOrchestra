@@ -1,15 +1,14 @@
-"""记忆系统 — JSON 文件存储 + LangChain Tool。
+"""记忆系统 — JSON 文件存储。
 
 存储结构:
   data/profile.json   — 长期画像（任务完成后自动提炼）
-  data/memories.json  — 键值记忆（Assistant 通过 tool 写入）
+  data/memories.json  — 键值记忆（通过 tools.save_memory/read_memory 操作）
   data/tasks/{id}.json — 已完成任务快照
 """
 
 import json
 from pathlib import Path
 from datetime import datetime
-from langchain_core.tools import tool
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TASKS_DIR = DATA_DIR / "tasks"
@@ -36,16 +35,9 @@ def _write_json(path: Path, data):
     )
 
 
-# ── LangChain Tools ──
+# ── 记忆读写（供 tools.py 中的 LangChain Tool 调用）──
 
-@tool
-def save_memory(key: str, value: str) -> str:
-    """写入一条长期记忆。用于记录学生持续性的学习特征。
-
-    Args:
-        key: 记忆键，建议格式 'weakness:<知识点>' 或 'strength:<知识点>' 或 'note:<描述>'
-        value: 记忆内容，描述具体观察
-    """
+def raw_save_memory(key: str, value: str) -> str:
     _ensure_dirs()
     memories = _read_json(MEMORIES_PATH)
     memories[key] = value
@@ -53,23 +45,13 @@ def save_memory(key: str, value: str) -> str:
     return f"记忆已保存: {key}"
 
 
-@tool
-def read_memory(prefix: str = "") -> str:
-    """读取长期记忆。用于决策前了解学生过去表现。
-
-    Args:
-        prefix: 前缀过滤，如 'weakness:' 只返回薄弱点。空字符串返回全部。
-    """
+def raw_read_memory(prefix: str = "") -> str:
     memories = _read_json(MEMORIES_PATH)
     if prefix:
         memories = {k: v for k, v in memories.items() if k.startswith(prefix)}
     if not memories:
         return "暂无相关记忆。"
     return "\n".join(f"- {k}: {v}" for k, v in memories.items())
-
-
-# Assistant 绑定的工具列表
-MEMORY_TOOLS = [save_memory, read_memory]
 
 
 # ── 画像管理（任务完成后自动调用，非 Tool）──
