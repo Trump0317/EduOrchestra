@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime
 from langchain_core.tools import tool
 
-DATA_DIR = Path("data")
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TASKS_DIR = DATA_DIR / "tasks"
 PROFILE_PATH = DATA_DIR / "profile.json"
 MEMORIES_PATH = DATA_DIR / "memories.json"
