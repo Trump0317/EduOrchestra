@@ -36,11 +36,11 @@
 │  │  ├── state.py    AgentState 定义       │  │
 │  │  ├── graph.py    图编排 + 条件路由     │  │
 │  │  ├── llm.py      LLM 客户端封装        │  │
-│  │  ├── tools.py    外部工具（搜索）      │  │
+│  │  ├── tools.py     LangChain 工具集 + 搜索 │  │
 │  │  ├── prompt.py   Prompt 模板引擎       │  │
 │  │  └── agents/     Agent 节点 (5)        │  │
 │  │      ├── planner.py     ← 制定计划 (LLM)   │  │
-│  │      ├── assistant.py  ← 智能路由 (LLM)   │  │
+│  │      ├── assistant.py  ← 智能路由 + Tool Calling │  │
 │  │      ├── resource.py   ← 学习资料 (LLM)   │  │
 │  │      ├── practice.py   ← 出题+判题         │  │
 │  │      └── feedback.py   ← 答题诊断 (LLM)   │  │
@@ -70,23 +70,25 @@ eduorchestra/
 │   ├── workflow.md testing.md commit.md
 │   ├── versions.md
 │   └── versions/
-│       └── v0.1.md ~ v0.7.md
+│       └── v0.1.md ~ v0.9.md
 ├── server/                   ← Python 后端
 │   ├── main.py               ← FastAPI 入口
 │   ├── config.py             ← 配置管理
+│   ├── memory.py             ← 记忆系统 (JSON) (v0.9+)
 │   ├── routers/              ← API 路由
 │   │   ├── __init__.py
 │   │   ├── config.py         ← 配置 API
-│   │   └── task.py           ← 学习任务 API
+│   │   ├── task.py           ← 学习任务 API
+│   │   └── progress.py       ← 学习进度 API (v0.9+)
 │   ├── orchestrator/         ← LangGraph 状态图 + LLM
 │   │   ├── state.py          ← AgentState
 │   │   ├── graph.py          ← 图编排 + 条件路由
 │   │   ├── llm.py            ← LLM 客户端
-│   │   ├── tools.py          ← 外部工具（搜索）
+│   │   ├── tools.py          ← 搜索 + LangChain Tools (v0.9+)
 │   │   ├── prompt.py         ← Prompt 模板引擎
 │   │   └── agents/           ← Agent 节点 (5)
 │   │       ├── planner.py    ← 制定学习计划 (v0.7)
-│   │       ├── assistant.py  ← 智能路由器 (v0.7)
+│   │       ├── assistant.py  ← 智能路由 + Tool Calling (v0.9+)
 │   │       ├── resource.py   ← 学习资料推荐
 │   │       ├── practice.py   ← 出题 + 判题
 │   │       └── feedback.py   ← 答题诊断 (v0.7)
@@ -98,7 +100,6 @@ eduorchestra/
 │       │   ├── test_llm.py
 │       │   ├── test_prompt.py
 │       │   ├── test_tools.py
-│       │   ├── test_models.py     ← v0.9+
 │       │   ├── test_memory.py     ← v0.9+
 │       │   └── test_graph_structure.py
 │       └── integration/
