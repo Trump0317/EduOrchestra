@@ -36,23 +36,30 @@
 │  │  ├── state.py    AgentState 定义       │  │
 │  │  ├── graph.py    图编排 + 条件路由     │  │
 │  │  ├── llm.py      LLM 客户端封装        │  │
+│  │  ├── tools.py    外部工具（搜索）      │  │
 │  │  ├── prompt.py   Prompt 模板引擎       │  │
-│  │  └── agents/     Agent 节点            │  │
-│  │      ├── assistant.py  ← 全局主管      │  │
-│  │      ├── resource.py   ← 学习资料      │  │
-│  │      └── practice.py   ← 出题+判题     │  │
+│  │  └── agents/     Agent 节点 (5)        │  │
+│  │      ├── planner.py     ← 制定计划 (LLM)   │  │
+│  │      ├── assistant.py  ← 智能路由 (LLM)   │  │
+│  │      ├── resource.py   ← 学习资料 (LLM)   │  │
+│  │      ├── practice.py   ← 出题+判题         │  │
+│  │      └── feedback.py   ← 答题诊断 (LLM)   │  │
 │  └────────────────────────────────────────┘  │
 └──────────────────────────────────────────────┘
 ```
 
-**图结构** (v0.5)：
+**图结构** (v0.7)：
 
 ```
-assistant → resource → practice(中断) → assistant → decide
-    ↑                                                    │
-    └──────────── next / repeat ─────────────────────────┘
-                                                    done → END
+planner → assistant → resource → practice(⏸)
+              ↑                      │
+              └─── feedback ←────────┘
 ```
+
+- Planner: 制定计划 → Assistant 决定开始
+- Assistant: 读全局状态 → 路由到 resource 或 END
+- Resource → Practice（出题后暂停等答案）
+- Feedback: 答题诊断 → Assistant 智能路由（repeat / next / done）
 
 ## 目录结构
 
@@ -63,7 +70,7 @@ eduorchestra/
 │   ├── workflow.md testing.md commit.md
 │   ├── versions.md
 │   └── versions/
-│       └── v0.1.md, v0.2.md, v0.3.md, v0.4.md, v0.5.md, v0.6.md
+│       └── v0.1.md ~ v0.7.md
 ├── server/                   ← Python 后端
 │   ├── main.py               ← FastAPI 入口
 │   ├── config.py             ← 配置管理
@@ -75,12 +82,14 @@ eduorchestra/
 │   │   ├── state.py          ← AgentState
 │   │   ├── graph.py          ← 图编排 + 条件路由
 │   │   ├── llm.py            ← LLM 客户端
-│   │   ├── tools.py          ← 外部工具（搜索等，v0.6+）
+│   │   ├── tools.py          ← 外部工具（搜索）
 │   │   ├── prompt.py         ← Prompt 模板引擎
-│   │   └── agents/           ← Agent 节点
-│   │       ├── assistant.py  ← 全局主管（v0.5）
+│   │   └── agents/           ← Agent 节点 (5)
+│   │       ├── planner.py    ← 制定学习计划 (v0.7)
+│   │       ├── assistant.py  ← 智能路由器 (v0.7)
 │   │       ├── resource.py   ← 学习资料推荐
-│   │       └── practice.py   ← 出题 + 判题
+│   │       ├── practice.py   ← 出题 + 判题
+│   │       └── feedback.py   ← 答题诊断 (v0.7)
 │   ├── demo.py               ← CLI 交互演示
 │   └── tests/                ← 后端测试
 │       ├── conftest.py
@@ -88,6 +97,7 @@ eduorchestra/
 │       │   ├── test_config.py
 │       │   ├── test_llm.py
 │       │   ├── test_prompt.py
+│       │   ├── test_tools.py
 │       │   └── test_graph_structure.py
 │       └── integration/
 │           ├── test_health.py
@@ -95,6 +105,8 @@ eduorchestra/
 │           ├── test_task_api.py
 │           ├── test_workflow.py
 │           ├── test_assistant.py
+│           ├── test_planner.py
+│           ├── test_feedback.py
 │           └── test_resource.py
 ├── client/                   ← React 前端
 │   ├── index.html
@@ -106,8 +118,10 @@ eduorchestra/
 │       └── App.css
 ├── data/                     ← 运行时数据
 │   ├── prompts/              ← Prompt 模板
+│   │   ├── planner.md
 │   │   ├── assistant.md
-│   │   └── resource.md
+│   │   ├── resource.md
+│   │   └── feedback.md
 ├── .env.example
 ├── pyproject.toml
 └── README.md
