@@ -19,11 +19,14 @@ def decide_route(state: AgentState) -> str:
     """根据 Assistant 的 next_action 路由。
 
     - "next" / "repeat" → resource（新一轮学习）
+    - "replan" → planner（调整计划）
     - "done" → END
     """
     action = state.get("next_action", "")
     if action == "done":
         return END
+    if action == "replan":
+        return "planner"
     return "resource"
 
 
