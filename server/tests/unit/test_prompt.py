@@ -17,7 +17,7 @@ class TestLoadPrompt:
     def test_returns_content(self):
         """模板文件存在时返回文件内容"""
         import orchestrator.prompt as prompt_mod
-        content = prompt_mod.load_prompt("planner")
+        content = prompt_mod.load_prompt("assistant")
         assert len(content) > 0
         assert isinstance(content, str)
 

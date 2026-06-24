@@ -5,7 +5,7 @@
 # - test_planner_handles_specific_goal: 不同目标 → 返回对应步骤
 
 import pytest
-from orchestrator.agents.planner import planner_node
+from orchestrator.agents.assistant import assistant_node
 
 
 def make_state(plan=None, answers=None, step=0):
@@ -32,7 +32,7 @@ class TestPlanner:
     def test_planner_creates_plan(self):
         """首次调用：创建计划，action=next"""
         state = make_state()
-        result = planner_node(state)
+        result = assistant_node(state)
 
         assert "plan" in result
         assert 2 <= len(result["plan"]) <= 5
@@ -52,7 +52,7 @@ class TestPlanner:
             ],
             step=0,
         )
-        result = planner_node(state)
+        result = assistant_node(state)
 
         assert result["feedback"] is not None
         assert result["feedback"].get("summary"), "summary 不应为空"
@@ -64,7 +64,7 @@ class TestPlanner:
         """不同目标 → 对应步骤"""
         state = make_state()
         state["task_goal"] = "理解集合的基本概念：子集、交集、并集"
-        result = planner_node(state)
+        result = assistant_node(state)
 
         plan_text = " ".join(s["title"] for s in result["plan"])
         assert any(kw in plan_text for kw in ["集合", "子集", "交集", "并集"]), (

@@ -40,7 +40,7 @@ def _format_answers(answers: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def planner_node(state: AgentState) -> dict:
+def assistant_node(state: AgentState) -> dict:
     """全局主管节点。"""
     plan = state.get("plan", [])
     answers = state.get("answers", [])
@@ -76,7 +76,7 @@ def planner_node(state: AgentState) -> dict:
 
     # 渲染 Prompt
     prompt = render_prompt(
-        "planner",
+        "assistant",
         task_goal=state["task_goal"],
         step_index=step_index + 1,
         total_steps=total_steps if total_steps > 0 else "（尚未制定）",

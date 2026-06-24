@@ -11,12 +11,12 @@ interface TaskState {
   current_step: number;
   resources: { type: string; title: string; url: string }[];
   questions: { id: string; content: string; options: string[]; kp: string }[];
-  analytics: Record<string, any> | null;
   feedback: { summary: string; suggestion: string } | null;
   next_action: string;
+  step_history: { step_index: number; rounds: number; best_accuracy: number; latest_accuracy: number }[];
 }
 
-type Phase = "idle" | "loading" | "plan" | "step" | "result";
+type Phase = "idle" | "loading" | "plan" | "resource" | "practice" | "result";
 
 /* ── 子组件 ── */
 
@@ -29,81 +29,57 @@ function Spinner({ text }: { text: string }) {
   );
 }
 
-/** 步骤进度条 */
-function StepProgress({
-  current,
-  plan,
-}: {
-  current: number;
-  plan: TaskState["plan"];
-}) {
+function StepDots({ current, plan }: { current: number; plan: TaskState["plan"] }) {
   return (
-    <div className="step-progress">
-      <div className="step-progress-bar">
-        {plan.map((_, i) => (
-          <div
-            key={i}
-            className={`step-dot ${i < current ? "done" : i === current ? "active" : ""}`}
-          >
-            <span>{i + 1}</span>
-          </div>
-        ))}
-      </div>
+    <div className="step-dots">
+      {plan.map((_, i) => (
+        <div
+          key={i}
+          className={`dot ${i < current ? "done" : i === current ? "active" : ""}`}
+        />
+      ))}
     </div>
   );
 }
 
-function GoalForm({
-  onSubmit,
-  loading,
-}: {
-  onSubmit: (goal: string) => void;
-  loading: boolean;
-}) {
+/* ── Idle ── */
+function GoalForm({ onSubmit }: { onSubmit: (goal: string) => void }) {
   const [goal, setGoal] = useState("");
   return (
     <form
-      className="card"
+      className="card center"
       onSubmit={(e) => {
         e.preventDefault();
         if (goal.trim()) onSubmit(goal.trim());
       }}
     >
       <h2>🎯 你想学什么？</h2>
-      <p className="hint">输入一个高一数学知识点作为学习目标</p>
+      <p className="hint">输入一个高一数学知识点</p>
       <input
         type="text"
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
         placeholder="例如：掌握二次函数"
-        disabled={loading}
         autoFocus
       />
-      <button type="submit" disabled={loading || !goal.trim()}>
-        {loading ? "生成中..." : "开始学习"}
-      </button>
+      <button type="submit" disabled={!goal.trim()}>开始学习</button>
     </form>
   );
 }
 
-function PlanView({
-  plan,
-  onStart,
-}: {
-  plan: TaskState["plan"];
-  onStart: () => void;
-}) {
+/* ── Plan ── */
+function PlanView({ plan, onStart }: { plan: TaskState["plan"]; onStart: () => void }) {
   return (
-    <div className="card">
+    <div className="card center">
       <h2>📋 学习计划</h2>
-      <p className="hint">AI 已将你的目标拆解为 {plan.length} 个步骤</p>
+      <p className="hint">助手已将目标拆解为 {plan.length} 个步骤</p>
       <ol className="plan-list">
-        {plan.map((step, i) => (
+        {plan.map((s, i) => (
           <li key={i}>
-            <span className="plan-step-num">{i + 1}</span>
+            <span className="plan-num">{i + 1}</span>
             <div>
-              <strong>{step.title}</strong>
-              <p>{step.desc}</p>
+              <strong>{s.title}</strong>
+              <p>{s.desc}</p>
             </div>
           </li>
         ))}
@@ -113,83 +89,77 @@ function PlanView({
   );
 }
 
-function StepView({
+/* ── Resource ── */
+function ResourceView({
   taskState,
-  selectedAnswers,
-  onAnswerChange,
-  onSubmit,
-  loading,
+  onStartPractice,
 }: {
   taskState: TaskState;
-  selectedAnswers: Record<string, string>;
-  onAnswerChange: (id: string, answer: string) => void;
-  onSubmit: () => void;
-  loading: boolean;
+  onStartPractice: () => void;
 }) {
-  const { plan, current_step, resources, questions } = taskState;
-  const step = plan[current_step];
-  const allAnswered = questions.every((q) => selectedAnswers[q.id]);
-
+  const step = taskState.plan[taskState.current_step];
   return (
     <>
-      <StepProgress
-        current={current_step}
-        plan={plan}
-      />
-
-      <div className="card section-title">
+      <StepDots current={taskState.current_step} plan={taskState.plan} />
+      <div className="card center">
         <span className="step-label">
-          第 {current_step + 1} / {plan.length} 步
+          第 {taskState.current_step + 1} / {taskState.plan.length} 步
         </span>
         <h2>{step?.title}</h2>
         <p className="step-desc">{step?.desc}</p>
       </div>
-
-      {resources?.length > 0 && (
-        <div className="card">
-          <h3>📚 学习资料</h3>
-          <div className="resource-list">
-            {resources.map((r, i) => (
-              <a
-                key={i}
-                href={r.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="resource-item"
-              >
-                <span className="resource-type">
-                  {r.type === "video" ? "🎬" : "📄"}
-                </span>
-                <span>{r.title}</span>
-              </a>
-            ))}
-          </div>
+      <div className="card">
+        <h3>📚 学习资料</h3>
+        <div className="resource-list">
+          {taskState.resources.map((r, i) => (
+            <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="res-item">
+              <span className="res-icon">{r.type === "video" ? "🎬" : "📄"}</span>
+              <span>{r.title}</span>
+            </a>
+          ))}
         </div>
-      )}
+      </div>
+      <button onClick={onStartPractice}>开始做题</button>
+    </>
+  );
+}
 
+/* ── Practice ── */
+function PracticeView({
+  taskState,
+  selected,
+  onChange,
+  onSubmit,
+}: {
+  taskState: TaskState;
+  selected: Record<string, string>;
+  onChange: (id: string, val: string) => void;
+  onSubmit: () => void;
+}) {
+  const allAnswered = taskState.questions.every((q) => selected[q.id]);
+  const step = taskState.plan[taskState.current_step];
+  return (
+    <>
+      <StepDots current={taskState.current_step} plan={taskState.plan} />
+      <div className="card center">
+        <span className="step-label">
+          第 {taskState.current_step + 1} / {taskState.plan.length} 步
+        </span>
+        <h2>{step?.title}</h2>
+      </div>
       <div className="card">
         <h3>✏️ 练习题</h3>
-        {questions.map((q) => (
-          <div key={q.id} className="question-item">
-            <p className="question-text">{q.content}</p>
-            <div className="options">
+        {taskState.questions.map((q) => (
+          <div key={q.id} className="q-item">
+            <p className="q-text">{q.content}</p>
+            <div className="opts">
               {q.options.map((opt) => {
                 const letter = opt.charAt(0);
                 return (
-                  <label
-                    key={letter}
-                    className={`option-label ${
-                      selectedAnswers[q.id] === letter ? "selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={q.id}
-                      value={letter}
-                      checked={selectedAnswers[q.id] === letter}
-                      onChange={() => onAnswerChange(q.id, letter)}
-                      disabled={loading}
-                    />
+                  <label key={letter} className={`opt ${selected[q.id] === letter ? "sel" : ""}`}>
+                    <input type="radio" name={q.id} value={letter}
+                      checked={selected[q.id] === letter}
+                      onChange={() => onChange(q.id, letter)} />
                     <span>{opt}</span>
                   </label>
                 );
@@ -197,18 +167,13 @@ function StepView({
             </div>
           </div>
         ))}
-        <button
-          className="submit-btn"
-          onClick={onSubmit}
-          disabled={!allAnswered || loading}
-        >
-          {loading ? "提交中..." : "提交答案"}
-        </button>
+        <button onClick={onSubmit} disabled={!allAnswered}>提交答案</button>
       </div>
     </>
   );
 }
 
+/* ── Result ── */
 function ResultView({
   taskState,
   onContinue,
@@ -218,75 +183,53 @@ function ResultView({
   onContinue: () => void;
   onRestart: () => void;
 }) {
-  const { analytics, feedback, plan, current_step, next_action } = taskState;
+  const { feedback, plan, current_step, next_action, step_history } = taskState;
+  const lastRecord = step_history?.[step_history.length - 1];
   const totalSteps = plan.length;
-  const done = current_step >= totalSteps && next_action !== "repeat_step";
 
   return (
     <>
-      {analytics && (
-        <div className="card result-card">
+      {lastRecord && (
+        <div className="card center">
           <h3>📊 答题结果</h3>
           <div className="stats">
             <div className="stat">
-              <span className="stat-value">
-                {analytics.correct_count}/{analytics.total_questions}
-              </span>
-              <span className="stat-label">正确</span>
+              <span className="stat-val">{(lastRecord.latest_accuracy * 100).toFixed(0)}%</span>
+              <span className="stat-lbl">正确率</span>
             </div>
             <div className="stat">
-              <span className="stat-value">
-                {(analytics.accuracy * 100).toFixed(0)}%
-              </span>
-              <span className="stat-label">正确率</span>
+              <span className="stat-val">{lastRecord.rounds}</span>
+              <span className="stat-lbl">第几轮</span>
             </div>
           </div>
-          {analytics.weak_points?.length > 0 && (
-            <div className="weak-points">
-              薄弱点：{analytics.weak_points.join("、")}
-            </div>
-          )}
-          {analytics.summary && (
-            <p className="summary-text">{analytics.summary}</p>
-          )}
         </div>
       )}
 
       {feedback && (
-        <div className="card result-card">
-          <h3>💡 反馈</h3>
-          <p className="feedback-summary">{feedback.summary}</p>
-          <p className="feedback-suggestion">{feedback.suggestion}</p>
+        <div className="card center">
+          <h3>💬 助手反馈</h3>
+          <p className="fb-summary">{feedback.summary}</p>
+          <p className="fb-suggestion">{feedback.suggestion}</p>
         </div>
       )}
 
-      <div className="card action-card">
-        {done ? (
+      <div className="card center">
+        {next_action === "next" && current_step < totalSteps ? (
+          <>
+            <p className="action-hint">进入下一步</p>
+            <p className="next-preview"><strong>{plan[current_step]?.title}</strong></p>
+            <button onClick={onContinue}>查看学习资料</button>
+          </>
+        ) : next_action === "repeat" ? (
+          <>
+            <p className="action-hint">正确率不够，再学一次</p>
+            <button onClick={onContinue}>重新学习</button>
+          </>
+        ) : (
           <>
             <h3>🎉 全部完成！</h3>
             <p>已完成全部 {totalSteps} 个步骤</p>
             <button onClick={onRestart}>再来一次</button>
-          </>
-        ) : next_action === "repeat_step" ? (
-          <>
-            <p className="action-hint">
-              🔄 正确率不够，需要重新学习当前步骤
-            </p>
-            <button onClick={onContinue}>再做一次</button>
-          </>
-        ) : (
-          <>
-            <p className="action-hint">
-              ✅ 本步通关，准备进入下一步
-            </p>
-            {current_step + 1 < totalSteps && (
-              <p className="next-step-preview">
-                下一步：<strong>{plan[current_step + 1]?.title}</strong>
-              </p>
-            )}
-            <button onClick={onContinue}>
-              {current_step + 1 < totalSteps ? "进入下一步" : "继续"}
-            </button>
           </>
         )}
       </div>
@@ -299,70 +242,73 @@ function ResultView({
 function App() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [taskState, setTaskState] = useState<TaskState | null>(null);
-  const [selectedAnswers, setSelectedAnswers] = useState<
-    Record<string, string>
-  >({});
+  const [selected, setSelected] = useState<Record<string, string>>({});
   const [loadingMsg, setLoadingMsg] = useState("");
 
-  async function handleStart(goal: string) {
-    setLoadingMsg("AI 正在生成学习计划...");
-    setPhase("loading");
+  async function apiCall(url: string, body?: object): Promise<TaskState | null> {
     try {
-      const resp = await fetch("/api/task", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal }),
+      const resp = await fetch(url, {
+        method: body ? "POST" : "GET",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const state: TaskState = await resp.json();
-      setTaskState(state);
-      setPhase("plan");
-    } catch {
-      alert("创建任务失败，请检查后端是否启动。");
+      return await resp.json();
+    } catch (err) {
+      alert("请求失败，请检查后端是否启动");
       setPhase("idle");
+      return null;
     }
   }
 
-  function handleStartStep() {
-    setPhase("step");
-  }
-
-  function handleAnswerChange(questionId: string, answer: string) {
-    setSelectedAnswers((prev) => ({ ...prev, [questionId]: answer }));
-  }
-
-  async function handleSubmitAnswers() {
-    if (!taskState) return;
-    setLoadingMsg("AI 正在分析答题结果...");
+  async function handleStart(goal: string) {
+    setLoadingMsg("助手正在制定学习计划...");
     setPhase("loading");
-    const answers = Object.entries(selectedAnswers).map(
-      ([question_id, student_answer]) => ({ question_id, student_answer })
-    );
-    try {
-      const resp = await fetch(`/api/task/${taskState.task_id}/answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const state: TaskState = await resp.json();
+    const state = await apiCall("/api/task", { goal });
+    if (state) {
       setTaskState(state);
-      setSelectedAnswers({});
+      setPhase("plan");
+    }
+  }
+
+  function handleBeginStep() {
+    setPhase("resource");
+  }
+
+  function handleStartPractice() {
+    setPhase("practice");
+  }
+
+  async function handleSubmit() {
+    if (!taskState) return;
+    const answers = Object.entries(selected).map(([qid, ans]) => ({
+      question_id: qid,
+      student_answer: ans,
+    }));
+    setLoadingMsg("助手正在分析...");
+    setPhase("loading");
+    const state = await apiCall(`/api/task/${taskState.task_id}/answer`, { answers });
+    if (state) {
+      setTaskState(state);
+      setSelected({});
       setPhase("result");
-    } catch {
-      alert("提交失败，请重试。");
-      setPhase("step");
     }
   }
 
   function handleContinue() {
     if (!taskState) return;
-    setPhase("step");
+    if (taskState.next_action === "repeat") {
+      // 重新学习当前步骤 → 回到做题
+      setPhase("practice");
+    } else {
+      // next 或 done → 看资料
+      setPhase("resource");
+    }
   }
 
   function handleRestart() {
     setTaskState(null);
-    setSelectedAnswers({});
+    setSelected({});
     setPhase("idle");
   }
 
@@ -374,23 +320,24 @@ function App() {
       </header>
 
       <main>
-        {phase === "idle" && (
-          <GoalForm onSubmit={handleStart} loading={false} />
-        )}
+        {phase === "idle" && <GoalForm onSubmit={handleStart} />}
 
         {phase === "loading" && <Spinner text={loadingMsg} />}
 
         {phase === "plan" && taskState && (
-          <PlanView plan={taskState.plan} onStart={handleStartStep} />
+          <PlanView plan={taskState.plan} onStart={handleBeginStep} />
         )}
 
-        {phase === "step" && taskState && (
-          <StepView
+        {phase === "resource" && taskState && (
+          <ResourceView taskState={taskState} onStartPractice={handleStartPractice} />
+        )}
+
+        {phase === "practice" && taskState && (
+          <PracticeView
             taskState={taskState}
-            selectedAnswers={selectedAnswers}
-            onAnswerChange={handleAnswerChange}
-            onSubmit={handleSubmitAnswers}
-            loading={false}
+            selected={selected}
+            onChange={(id, val) => setSelected((p) => ({ ...p, [id]: val }))}
+            onSubmit={handleSubmit}
           />
         )}
 

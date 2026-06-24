@@ -1,18 +1,18 @@
 # server/tests/unit/test_graph_structure.py
 # 测试行为：
-# - test_planner_creates_plan: mock LLM 返回步骤 + action
-# - test_planner_analyzes_answers: mock LLM 分析答题 + 返回反馈
+# - test_assistant_creates_plan: mock LLM 返回步骤 + action
+# - test_assistant_analyzes_answers: mock LLM 分析答题 + 返回反馈
 # - test_resource_returns_resources: Resource 返回非空列表
 # - test_practice_returns_questions: Practice 返回题目 + waiting=True
 # - test_check_answer_correct: 相同答案判对
 # - test_check_answer_wrong: 不同答案判错
-# - test_graph_has_all_nodes: 图包含 planner/resource/practice 3 个节点
+# - test_graph_has_all_nodes: 图包含 assistant/resource/practice 3 个节点
 # - test_graph_edge_chain: resource→practice 链路存在
 # - test_graph_interrupts_before_practice: practice 在 interrupt_after 中
 
 from unittest.mock import patch
 
-from orchestrator.agents.planner import planner_node
+from orchestrator.agents.assistant import assistant_node
 from orchestrator.agents.resource import resource_node
 from orchestrator.agents.practice import practice_node, check_answer, Question
 from orchestrator.graph import build_graph
@@ -36,9 +36,9 @@ def make_base_state(**overrides) -> dict:
     return state
 
 
-# ── Planner 单元测试 ──
+# ── Assistant 单元测试 ──
 
-def test_planner_creates_plan():
+def test_assistant_creates_plan():
     """首次调用：mock LLM 返回 plan + action=next"""
     mock = {
         "plan": [
@@ -49,8 +49,8 @@ def test_planner_creates_plan():
         "action": "next",
     }
     state = make_base_state(plan=[], answers=[], step_history=[])
-    with patch("orchestrator.agents.planner.llm_invoke_json", return_value=mock):
-        result = planner_node(state)
+    with patch("orchestrator.agents.assistant.llm_invoke_json", return_value=mock):
+        result = assistant_node(state)
     assert len(result["plan"]) == 2
     assert result["plan"][0]["title"] == "理解概念"
     assert result["next_action"] == "next"
@@ -58,7 +58,7 @@ def test_planner_creates_plan():
     assert "current_step" not in result
 
 
-def test_planner_analyzes_answers():
+def test_assistant_analyzes_answers():
     """答题后：mock LLM 返回 feedback + action"""
     mock = {
         "plan": [],  # 不更新 plan
@@ -77,8 +77,8 @@ def test_planner_analyzes_answers():
              "latest_accuracy": 1.0},
         ],
     )
-    with patch("orchestrator.agents.planner.llm_invoke_json", return_value=mock):
-        result = planner_node(state)
+    with patch("orchestrator.agents.assistant.llm_invoke_json", return_value=mock):
+        result = assistant_node(state)
     assert result["next_action"] == "next"
     assert result["feedback"]["summary"] == "很好"
     # 有答案 + action=next → current_step 递增
@@ -128,7 +128,7 @@ def test_check_answer_wrong():
 def test_graph_has_all_nodes():
     graph = build_graph()
     nodes = list(graph.get_graph().nodes.keys())
-    for name in ("planner", "resource", "practice"):
+    for name in ("assistant", "resource", "practice"):
         assert name in nodes
 
 
