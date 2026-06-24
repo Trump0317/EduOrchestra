@@ -60,7 +60,7 @@ def test_workflow_resume_after_answer():
 
     assert state["feedback"] is not None
     assert state["feedback"].get("summary") is not None
-    assert state["next_action"] in ("repeat", "next")
+    assert state["next_action"] in ("repeat", "next", "replan")
 
 
 def test_workflow_repeat_on_all_wrong():
@@ -107,4 +107,4 @@ def test_workflow_completes_on_all_correct():
     state = graph.invoke(None, config)
     # v0.7: LLM 智能决策
     assert state["feedback"] is not None
-    assert state["next_action"] in ("next", "repeat")
+    assert state["next_action"] in ("next", "repeat", "replan")

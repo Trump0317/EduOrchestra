@@ -63,7 +63,7 @@ class TestAssistantRouting:
         )
         result = assistant_node(state)
 
-        assert result["next_action"] in ("next", "repeat", "done")
+        assert result["next_action"] in ("next", "repeat", "done", "replan")
 
     def test_assistant_routes_with_poor_performance(self):
         """全错答题：LLM 应倾向于 repeat"""
@@ -83,4 +83,4 @@ class TestAssistantRouting:
         )
         result = assistant_node(state)
 
-        assert result["next_action"] in ("next", "repeat", "done")
+        assert result["next_action"] in ("next", "repeat", "done", "replan")
