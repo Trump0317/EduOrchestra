@@ -48,18 +48,18 @@
 └──────────────────────────────────────────────┘
 ```
 
-**图结构** (v0.7)：
+**图结构** (v0.8)：
 
 ```
-planner → assistant → resource → practice(⏸)
-              ↑                      │
-              └─── feedback ←────────┘
+planner → assistant ─┬─ next/repeat → resource → practice → diagnose → assistant
+            ↑        ├─ done → END                                  │
+            │        └─ replan ─────────────────────────────────────┘
+            └────────────────────────────────────────────────────────┘
 ```
 
-- Planner: 制定计划 → Assistant 决定开始
-- Assistant: 读全局状态 → 路由到 resource 或 END
-- Resource → Practice（出题后暂停等答案）
-- Feedback: 答题诊断 → Assistant 智能路由（repeat / next / done）
+- Planner: 初始规划 / 动态重规划（双模式）
+- Assistant: 智能路由（next / repeat / done / replan）
+- Diagnose: 答题诊断 → Assistant 读取 feedback 判断是否需要 replan
 
 ## 目录结构
 
