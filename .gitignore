@@ -17,6 +17,9 @@ dist/
 .vscode/
 .idea/
 
+# Pi coding agent
+.pi/
+
 # Database
 *.db
 
