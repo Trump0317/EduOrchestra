@@ -23,6 +23,11 @@ dist/
 # Database
 *.db
 
+# Memory (runtime generated)
+data/memories.json
+data/profile.json
+data/tasks/
+
 # OS
 .DS_Store
 Thumbs.db
