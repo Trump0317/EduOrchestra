@@ -83,7 +83,7 @@ def create_task(body: TaskCreate):
             "questions": [],
             "waiting_for_answer": False,
             "answers": [],
-            "analytics": None,
+            "step_history": [],
             "feedback": None,
             "next_action": "",
         },
