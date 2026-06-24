@@ -8,8 +8,8 @@ EduOrchestra 是一个**多智能体协作的模拟课堂**，面向高一学生
 
 - **预置题库 + 后期拓展**：MVP 预置少量 JSON 题目，后续版本加入 AI 题目生成
 - **学生直接使用**：单用户本地模式，浏览器打开即用（当前聚焦后端）
-- **LangGraph 状态图编排**：5 个 Agent 作为状态图节点，通过共享 AgentState 协作，Practice 节点暂停等待学生输入
-- **Chat 常驻**：对话辅导 Agent 不参与状态图流转，作为独立端点提供，携带当前任务上下文
+- **LangGraph 状态图编排**：3 个 Agent 作为状态图节点，Assistant 作为全局主管贯穿全程，Practice 节点暂停等待学生输入
+- **Assistant 主管**：一个 Prompt 完成计划制定 + 答题分析 + 反馈生成 + 路由决策
 - **真实 LLM 驱动**：MVP 阶段即接入真实 LLM，Prompt 与代码分离
 
 ## 核心交互流程
@@ -18,35 +18,26 @@ EduOrchestra 是一个**多智能体协作的模拟课堂**，面向高一学生
 学生创建任务（如"掌握二次函数"）
            │
            ▼
-    Planner Agent: 将目标拆解为步骤序列
+    Assistant: 拆解为步骤序列 + 制定学习路径
            │
            ▼
-    Resource Agent: 为当前步骤搜集学习资料（视频、文章）
+    Resource: 为当前步骤搜集学习资料（视频、文章）
            │
            ▼
-    Practice 节点:  从题库出题 → 等待学生提交答案(⏸)
+    Practice:  从题库出题 → 等待学生提交答案(⏸)
            │         逐题判对错，记录答案
            ▼
-    Analytics Agent: 根据答题记录分析薄弱点
+    Assistant: 分析答题表现 → 生成反馈 → 决定路由
            │
-           ▼
-    Feedback Agent: 生成反馈报告 + 调整建议
-           │
-           ▼
-    判断: 需重新学习当前步骤？ → 回到 Plan/Resource
-          已完成当前步骤？     → 进入下一步
-          全部完成？           → 任务结束
-
-旁路: Chat 随时可用，携带当前任务上下文
+           ├─ repeat: 重新学习当前步骤 → Resource
+           ├─ next:   进入下一步         → Resource
+           └─ done:   全部完成           → 任务结束
 ```
 
 ## Agent 概览
 
 | Agent | 职责 | LLM | 数据依赖 |
 |-------|------|-----|---------|
-| Planner | 目标拆解为步骤序列 | ✅ | — |
+| **Assistant** | 全局主管：制定计划 + 分析答题 + 生成反馈 + 决定路由 | ✅ | task_goal, step_history, answers |
 | Resource | 搜索推荐学习视频/资料 | ✅ | 当前步骤信息 |
 | Practice | 从题库出题 + 判对错 | ❌ | 题库 JSON |
-| Analytics | 基于答题记录诊断薄弱点 | ✅ | 答题记录 |
-| Feedback | 生成反馈报告 + 调整建议 | ✅ | 学情分析结果 |
-| Chat | 对话辅导（独立端点） | ✅ | 当前任务上下文 |
