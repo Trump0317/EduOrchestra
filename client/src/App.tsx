@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 
-/* ── TypeScript 类型 ── */
+/* ── TypeScript ── */
 
 interface TaskState {
   task_id: string;
@@ -16,7 +16,7 @@ interface TaskState {
   next_action: string;
 }
 
-type Phase = "idle" | "loading" | "ready" | "result";
+type Phase = "idle" | "loading" | "plan" | "step" | "result";
 
 /* ── 子组件 ── */
 
@@ -25,6 +25,30 @@ function Spinner({ text }: { text: string }) {
     <div className="spinner">
       <div className="spinner-icon" />
       <p>{text}</p>
+    </div>
+  );
+}
+
+/** 步骤进度条 */
+function StepProgress({
+  current,
+  plan,
+}: {
+  current: number;
+  plan: TaskState["plan"];
+}) {
+  return (
+    <div className="step-progress">
+      <div className="step-progress-bar">
+        {plan.map((_, i) => (
+          <div
+            key={i}
+            className={`step-dot ${i < current ? "done" : i === current ? "active" : ""}`}
+          >
+            <span>{i + 1}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -39,7 +63,7 @@ function GoalForm({
   const [goal, setGoal] = useState("");
   return (
     <form
-      className="card goal-form"
+      className="card"
       onSubmit={(e) => {
         e.preventDefault();
         if (goal.trim()) onSubmit(goal.trim());
@@ -62,127 +86,147 @@ function GoalForm({
   );
 }
 
-function PlanView({ plan }: { plan: TaskState["plan"] }) {
+function PlanView({
+  plan,
+  onStart,
+}: {
+  plan: TaskState["plan"];
+  onStart: () => void;
+}) {
   return (
-    <div className="card section">
-      <h3>📋 学习计划</h3>
+    <div className="card">
+      <h2>📋 学习计划</h2>
+      <p className="hint">AI 已将你的目标拆解为 {plan.length} 个步骤</p>
       <ol className="plan-list">
         {plan.map((step, i) => (
           <li key={i}>
-            <strong>{step.title}</strong>
-            <p>{step.desc}</p>
+            <span className="plan-step-num">{i + 1}</span>
+            <div>
+              <strong>{step.title}</strong>
+              <p>{step.desc}</p>
+            </div>
           </li>
         ))}
       </ol>
+      <button onClick={onStart}>开始第一步</button>
     </div>
   );
 }
 
-function ResourcesView({
-  resources,
-}: {
-  resources: TaskState["resources"];
-}) {
-  if (!resources || resources.length === 0) return null;
-  return (
-    <div className="card section">
-      <h3>📚 学习资料</h3>
-      <div className="resource-list">
-        {resources.map((r, i) => (
-          <a
-            key={i}
-            href={r.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="resource-item"
-          >
-            <span className="resource-type">
-              {r.type === "video" ? "🎬" : "📄"}
-            </span>
-            <span>{r.title}</span>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function QuestionPanel({
-  questions,
+function StepView({
+  taskState,
   selectedAnswers,
   onAnswerChange,
   onSubmit,
   loading,
-  stepInfo,
 }: {
-  questions: TaskState["questions"];
+  taskState: TaskState;
   selectedAnswers: Record<string, string>;
   onAnswerChange: (id: string, answer: string) => void;
   onSubmit: () => void;
   loading: boolean;
-  stepInfo: string;
 }) {
+  const { plan, current_step, resources, questions } = taskState;
+  const step = plan[current_step];
   const allAnswered = questions.every((q) => selectedAnswers[q.id]);
+
   return (
-    <div className="card section">
-      <h3>✏️ 答题 — {stepInfo}</h3>
-      {questions.map((q) => (
-        <div key={q.id} className="question-item">
-          <p className="question-text">{q.content}</p>
-          <div className="options">
-            {q.options.map((opt) => {
-              const letter = opt.charAt(0);
-              return (
-                <label
-                  key={letter}
-                  className={`option-label ${
-                    selectedAnswers[q.id] === letter ? "selected" : ""
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={q.id}
-                    value={letter}
-                    checked={selectedAnswers[q.id] === letter}
-                    onChange={() => onAnswerChange(q.id, letter)}
-                    disabled={loading}
-                  />
-                  <span>{opt}</span>
-                </label>
-              );
-            })}
+    <>
+      <StepProgress
+        current={current_step}
+        plan={plan}
+      />
+
+      <div className="card section-title">
+        <span className="step-label">
+          第 {current_step + 1} / {plan.length} 步
+        </span>
+        <h2>{step?.title}</h2>
+        <p className="step-desc">{step?.desc}</p>
+      </div>
+
+      {resources?.length > 0 && (
+        <div className="card">
+          <h3>📚 学习资料</h3>
+          <div className="resource-list">
+            {resources.map((r, i) => (
+              <a
+                key={i}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="resource-item"
+              >
+                <span className="resource-type">
+                  {r.type === "video" ? "🎬" : "📄"}
+                </span>
+                <span>{r.title}</span>
+              </a>
+            ))}
           </div>
         </div>
-      ))}
-      <button
-        className="submit-btn"
-        onClick={onSubmit}
-        disabled={!allAnswered || loading}
-      >
-        {loading ? "提交中..." : "提交答案"}
-      </button>
-    </div>
+      )}
+
+      <div className="card">
+        <h3>✏️ 练习题</h3>
+        {questions.map((q) => (
+          <div key={q.id} className="question-item">
+            <p className="question-text">{q.content}</p>
+            <div className="options">
+              {q.options.map((opt) => {
+                const letter = opt.charAt(0);
+                return (
+                  <label
+                    key={letter}
+                    className={`option-label ${
+                      selectedAnswers[q.id] === letter ? "selected" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={q.id}
+                      value={letter}
+                      checked={selectedAnswers[q.id] === letter}
+                      onChange={() => onAnswerChange(q.id, letter)}
+                      disabled={loading}
+                    />
+                    <span>{opt}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <button
+          className="submit-btn"
+          onClick={onSubmit}
+          disabled={!allAnswered || loading}
+        >
+          {loading ? "提交中..." : "提交答案"}
+        </button>
+      </div>
+    </>
   );
 }
 
 function ResultView({
   taskState,
   onContinue,
-  loading,
+  onRestart,
 }: {
   taskState: TaskState;
   onContinue: () => void;
-  loading: boolean;
+  onRestart: () => void;
 }) {
   const { analytics, feedback, plan, current_step, next_action } = taskState;
   const totalSteps = plan.length;
-  const done = next_action === "" && current_step >= totalSteps;
+  const done = current_step >= totalSteps && next_action !== "repeat_step";
 
   return (
     <>
       {analytics && (
-        <div className="card section">
-          <h3>📊 答题分析</h3>
+        <div className="card result-card">
+          <h3>📊 答题结果</h3>
           <div className="stats">
             <div className="stat">
               <span className="stat-value">
@@ -199,7 +243,7 @@ function ResultView({
           </div>
           {analytics.weak_points?.length > 0 && (
             <div className="weak-points">
-              <p>薄弱点：{analytics.weak_points.join("、")}</p>
+              薄弱点：{analytics.weak_points.join("、")}
             </div>
           )}
           {analytics.summary && (
@@ -209,29 +253,42 @@ function ResultView({
       )}
 
       {feedback && (
-        <div className="card section">
-          <h3>💡 反馈与建议</h3>
+        <div className="card result-card">
+          <h3>💡 反馈</h3>
           <p className="feedback-summary">{feedback.summary}</p>
           <p className="feedback-suggestion">{feedback.suggestion}</p>
         </div>
       )}
 
-      <div className="card section next-step">
+      <div className="card action-card">
         {done ? (
           <>
             <h3>🎉 全部完成！</h3>
-            <p>你已经完成了全部 {totalSteps} 个步骤的学习。</p>
+            <p>已完成全部 {totalSteps} 个步骤</p>
+            <button onClick={onRestart}>再来一次</button>
           </>
         ) : next_action === "repeat_step" ? (
-          <p>🔄 需要重新学习当前步骤，再做一次题吧</p>
-        ) : next_action === "next_step" && current_step < totalSteps ? (
-          <p>
-            ✅ 进入下一步：<strong>{plan[current_step]?.title}</strong>
-          </p>
-        ) : null}
-        <button className="continue-btn" onClick={onContinue} disabled={loading}>
-          {done ? "重新开始" : "继续"}
-        </button>
+          <>
+            <p className="action-hint">
+              🔄 正确率不够，需要重新学习当前步骤
+            </p>
+            <button onClick={onContinue}>再做一次</button>
+          </>
+        ) : (
+          <>
+            <p className="action-hint">
+              ✅ 本步通关，准备进入下一步
+            </p>
+            {current_step + 1 < totalSteps && (
+              <p className="next-step-preview">
+                下一步：<strong>{plan[current_step + 1]?.title}</strong>
+              </p>
+            )}
+            <button onClick={onContinue}>
+              {current_step + 1 < totalSteps ? "进入下一步" : "继续"}
+            </button>
+          </>
+        )}
       </div>
     </>
   );
@@ -245,8 +302,10 @@ function App() {
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
+  const [loadingMsg, setLoadingMsg] = useState("");
 
   async function handleStart(goal: string) {
+    setLoadingMsg("AI 正在生成学习计划...");
     setPhase("loading");
     try {
       const resp = await fetch("/api/task", {
@@ -257,11 +316,15 @@ function App() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const state: TaskState = await resp.json();
       setTaskState(state);
-      setPhase("ready");
-    } catch (err) {
-      alert("创建任务失败，请检查后端是否启动");
+      setPhase("plan");
+    } catch {
+      alert("创建任务失败，请检查后端是否启动。");
       setPhase("idle");
     }
+  }
+
+  function handleStartStep() {
+    setPhase("step");
   }
 
   function handleAnswerChange(questionId: string, answer: string) {
@@ -270,6 +333,7 @@ function App() {
 
   async function handleSubmitAnswers() {
     if (!taskState) return;
+    setLoadingMsg("AI 正在分析答题结果...");
     setPhase("loading");
     const answers = Object.entries(selectedAnswers).map(
       ([question_id, student_answer]) => ({ question_id, student_answer })
@@ -284,31 +348,23 @@ function App() {
       const state: TaskState = await resp.json();
       setTaskState(state);
       setSelectedAnswers({});
-      // 如果还在等待答题 → 显示题目；否则显示结果
-      setPhase(state.status === "waiting_for_answer" ? "ready" : "result");
-    } catch (err) {
-      alert("提交答案失败，请重试");
-      setPhase("ready");
+      setPhase("result");
+    } catch {
+      alert("提交失败，请重试。");
+      setPhase("step");
     }
   }
 
   function handleContinue() {
-    if (!taskState) {
-      setPhase("idle");
-      return;
-    }
-    if (taskState.status === "waiting_for_answer") {
-      setPhase("ready");
-    } else {
-      // 已完成 → 回到首页
-      setTaskState(null);
-      setSelectedAnswers({});
-      setPhase("idle");
-    }
+    if (!taskState) return;
+    setPhase("step");
   }
 
-  const currentStep =
-    taskState?.plan[taskState.current_step]?.title ?? "";
+  function handleRestart() {
+    setTaskState(null);
+    setSelectedAnswers({});
+    setPhase("idle");
+  }
 
   return (
     <div className="app">
@@ -322,46 +378,32 @@ function App() {
           <GoalForm onSubmit={handleStart} loading={false} />
         )}
 
-        {phase === "loading" && (
-          <Spinner
-            text={
-              taskState === null
-                ? "AI 正在生成学习计划..."
-                : "AI 正在分析答题结果..."
-            }
-          />
+        {phase === "loading" && <Spinner text={loadingMsg} />}
+
+        {phase === "plan" && taskState && (
+          <PlanView plan={taskState.plan} onStart={handleStartStep} />
         )}
 
-        {phase === "ready" && taskState && (
-          <>
-            <div className="step-badge">
-              第 {taskState.current_step + 1} / {taskState.plan.length} 步
-            </div>
-            <PlanView plan={taskState.plan} />
-            <ResourcesView resources={taskState.resources} />
-            <QuestionPanel
-              questions={taskState.questions}
-              selectedAnswers={selectedAnswers}
-              onAnswerChange={handleAnswerChange}
-              onSubmit={handleSubmitAnswers}
-              loading={false}
-              stepInfo={currentStep}
-            />
-          </>
+        {phase === "step" && taskState && (
+          <StepView
+            taskState={taskState}
+            selectedAnswers={selectedAnswers}
+            onAnswerChange={handleAnswerChange}
+            onSubmit={handleSubmitAnswers}
+            loading={false}
+          />
         )}
 
         {phase === "result" && taskState && (
           <ResultView
             taskState={taskState}
             onContinue={handleContinue}
-            loading={false}
+            onRestart={handleRestart}
           />
         )}
       </main>
 
-      <footer>
-        <p>EduOrchestra v0.4</p>
-      </footer>
+      <footer>EduOrchestra v0.4</footer>
     </div>
   );
 }
