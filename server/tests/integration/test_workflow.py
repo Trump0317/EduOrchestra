@@ -64,7 +64,7 @@ def test_workflow_resume_after_answer():
 
 
 def test_workflow_repeat_on_all_wrong():
-    """全答错 → next_action = repeat"""
+    """全答错 → 图正常流转，有 feedback"""
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-3"}}
 
@@ -82,11 +82,13 @@ def test_workflow_repeat_on_all_wrong():
 
     graph.update_state(config, {"answers": wrong_answers, "waiting_for_answer": False})
     state = graph.invoke(None, config)
-    assert state["next_action"] == "repeat"
+    # v0.7: Assistant LLM 智能决策，不硬断言 action
+    assert state["feedback"] is not None
+    assert state["next_action"] in ("repeat", "next")
 
 
 def test_workflow_completes_on_all_correct():
-    """全答对 → next_action = next"""
+    """全答对 → 图正常流转"""
     graph = build_graph()
     config = {"configurable": {"thread_id": "flow-4"}}
 
@@ -103,4 +105,6 @@ def test_workflow_completes_on_all_correct():
 
     graph.update_state(config, {"answers": correct_answers, "waiting_for_answer": False})
     state = graph.invoke(None, config)
-    assert state["next_action"] == "next"
+    # v0.7: LLM 智能决策
+    assert state["feedback"] is not None
+    assert state["next_action"] in ("next", "repeat")
