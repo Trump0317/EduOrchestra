@@ -62,7 +62,8 @@ eduorchestra/
 │   ├── config.py             ← 配置管理
 │   ├── routers/              ← API 路由
 │   │   ├── __init__.py
-│   │   └── config.py         ← 配置 API
+│   │   ├── config.py         ← 配置 API
+│   │   └── task.py           ← 学习任务 API（v0.4）
 │   ├── orchestrator/         ← LangGraph 状态图（v0.2）+ LLM（v0.3）
 │   │   ├── __init__.py
 │   │   ├── state.py          ← AgentState
@@ -130,4 +131,10 @@ eduorchestra/
 | GET | `/api/config` | 获取配置（LLM provider/model） |
 | PUT | `/api/config` | 更新配置 |
 
+### 学习任务（v0.4）
 
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/task` | 创建任务 + 首次 invoke |
+| GET | `/api/task/{task_id}` | 查询任务状态 |
+| POST | `/api/task/{task_id}/answer` | 提交答案 + resume 图 |
