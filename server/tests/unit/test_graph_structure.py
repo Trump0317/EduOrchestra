@@ -104,11 +104,20 @@ def test_resource_returns_resources(mock_llm):
     assert result["resources"][0]["type"] in ("video", "article")
 
 
-# ── Practice 单元测试 ──
+# ── Practice 单元测试（v0.10: AI 出题） ──
 
-def test_practice_returns_questions():
-    result = practice_node(make_base_state())
-    assert len(result["questions"]) > 0
+@patch("orchestrator.agents.practice.llm_invoke_json")
+def test_practice_returns_questions(mock_llm):
+    mock_llm.return_value = {
+        "questions": [
+            {"id": "q1", "content": "测试题",
+             "options": ["A. a", "B. b", "C. c", "D. d"],
+             "answer": "A", "kp": "测试"},
+        ]
+    }
+    result = practice_node(make_base_state(
+        plan=[{"title": "概念", "desc": "学习概念"}], current_step=0))
+    assert len(result["questions"]) == 1
     assert result["waiting_for_answer"] is True
 
 

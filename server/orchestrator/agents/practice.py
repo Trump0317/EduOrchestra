@@ -1,21 +1,36 @@
+"""Practice Agent — LLM 出题 + 判题。
+
+v0.10: 从固定题库改为 LLM 根据当前步骤动态出题，repeat 时缓存复用。
+"""
+
 from orchestrator.state import AgentState, Question
-
-
-QUESTION_BANK: list[Question] = [
-    {"id": "q1", "content": "二次函数 y=x² 的对称轴是？", "options": ["A. x=0", "B. x=1", "C. y=0", "D. y=1"], "answer": "A", "kp": "二次函数"},
-    {"id": "q2", "content": "二次函数 y=(x-1)²+2 的顶点坐标是？", "options": ["A. (1,2)", "B. (-1,2)", "C. (1,-2)", "D. (-1,-2)"], "answer": "A", "kp": "二次函数"},
-    {"id": "q3", "content": "二次函数 y=x²-2x+1 的判别式 Δ 的值是？", "options": ["A. 0", "B. 1", "C. 2", "D. 4"], "answer": "A", "kp": "二次函数"},
-]
+from orchestrator.llm import llm_invoke_json
+from orchestrator.prompt import render_prompt
 
 
 def practice_node(state: AgentState) -> dict:
-    """空实现：返回固定题目，设置 waiting 标记"""
+    """根据当前学习步骤，调用 LLM 生成 2-3 道选择题。
+
+    如果 state.questions 已有值（repeat 场景），直接复用不重新生成。
+    """
+    # 缓存：已有题目时复用
+    if state.get("questions"):
+        return {"waiting_for_answer": True}
+
+    step = state["plan"][state["current_step"]]
+    prompt = render_prompt(
+        "practice",
+        task_goal=state["task_goal"],
+        step_title=step["title"],
+        step_desc=step["desc"],
+    )
+    result = llm_invoke_json(prompt)
     return {
-        "questions": QUESTION_BANK[:2],
+        "questions": result["questions"],
         "waiting_for_answer": True,
     }
 
 
 def check_answer(question: Question, student_answer: str) -> bool:
-    """判题：比对答案字符串"""
+    """判题：比对答案字符串。"""
     return student_answer == question["answer"]
