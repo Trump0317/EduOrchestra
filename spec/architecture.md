@@ -98,6 +98,8 @@ eduorchestra/
 │       │   ├── test_llm.py
 │       │   ├── test_prompt.py
 │       │   ├── test_tools.py
+│       │   ├── test_models.py     ← v0.9+
+│       │   ├── test_memory.py     ← v0.9+
 │       │   └── test_graph_structure.py
 │       └── integration/
 │           ├── test_health.py
@@ -144,3 +146,11 @@ eduorchestra/
 | POST | `/api/task` | 创建任务 + 首次 invoke |
 | GET | `/api/task/{task_id}` | 查询任务状态 |
 | POST | `/api/task/{task_id}/answer` | 提交答案 + resume 图 |
+
+### 学习进度（v0.9+）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/progress` | 学习进度总览 |
+| GET | `/api/progress/topics` | 已学知识点列表 |
+| GET | `/api/progress/tasks` | 历史任务列表 |
